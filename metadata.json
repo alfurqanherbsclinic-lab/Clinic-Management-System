@@ -1,0 +1,6 @@
+{
+  "name": "Al-Furqan HIS",
+  "description": "Al-Furqan Herb's Clinic - Modern Hospital Information System",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
