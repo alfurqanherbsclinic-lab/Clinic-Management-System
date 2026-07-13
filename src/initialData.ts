@@ -10,7 +10,7 @@ export const initialPatients: Patient[] = [
     age: 45,
     gender: "Mwanaume",
     address: "Gungu, Kigoma",
-    photoUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+    photoUrl: "/taaag.png",
     fingerprintPlaceholder: true,
     emergencyContact: {
       name: "Salma Hassan",
@@ -46,7 +46,7 @@ export const initialPatients: Patient[] = [
     age: 32,
     gender: "Mwanamke",
     address: "Mwanga, Kigoma",
-    photoUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
+    photoUrl: "/taaag2.jpg",
     fingerprintPlaceholder: false,
     emergencyContact: {
       name: "Suleiman Bakari",
@@ -82,7 +82,7 @@ export const initialPatients: Patient[] = [
     age: 28,
     gender: "Mwanaume",
     address: "Gungu, Kigoma",
-    photoUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+    photoUrl: "/taaag 3.png",
     fingerprintPlaceholder: true,
     emergencyContact: {
       name: "Shaban Juma",
