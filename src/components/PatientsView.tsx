@@ -176,7 +176,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
   // Duplicate patient name detection
   useEffect(() => {
     if (name.trim()) {
-      const exists = patients.some(p => p.name.toLowerCase().trim() === name.toLowerCase().trim());
+      const exists = patients.some(p => (p.name || "").toLowerCase().trim() === name.toLowerCase().trim());
       setDuplicateAlert(exists);
     } else {
       setDuplicateAlert(false);
