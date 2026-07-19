@@ -581,8 +581,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                   <div className="w-12 h-12 flex items-center justify-center">
   <img src="/taaag3.png" alt="Logo" className="w-full h-full object-contain" />
 </div>
-
-                    <div className="text-left leading-tight">
+                  <div className="text-left leading-tight">
                       <h2 className="text-sm font-black font-display text-primary tracking-tight">AL-FURQAN CLINIC</h2>
                       <p className="text-[9px] text-secondary font-bold uppercase tracking-wider">Tiba Asili na Sunnah</p>
                     </div>
