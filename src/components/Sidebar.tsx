@@ -66,10 +66,11 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, onClose }: Si
         </button>
 
         {/* Professional Logo Icon representation */}
-        <div className="w-32 h-32 mx-auto rounded-full bg-white/5 border-2 border-secondary/30 flex items-center justify-center p-3 mb-3 shadow-inner relative overflow-hidden group">
-          <div className="absolute inset-0 bg-secondary/5 group-hover:bg-secondary/10 transition-colors" />
-          <span className="font-display font-black text-secondary text-2xl tracking-tight z-10">AL-FURQAN</span>
-        </div>
+<div className="w-32 h-32 mx-auto bg-white/5 border-2 border-secondary/30 flex items-center justify-center p-3 mb-3 shadow-inner relative overflow-hidden group">
+  <div className="absolute inset-0 bg-secondary/5 group-hover:bg-secondary/10 transition-colors" />
+  <span className="font-display font-black text-secondary text-2xl tracking-tight z-10">AL-FURQAN</span>
+</div>
+
         
         <h2 className="text-lg font-bold font-display tracking-wider uppercase text-white">TAARIFA ZA OFISI</h2>
         <p className="text-xs text-secondary font-bold tracking-widest uppercase mt-0.5">Al-Furqan Herb's Clinic</p>
