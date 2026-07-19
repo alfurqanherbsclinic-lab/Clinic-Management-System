@@ -66,7 +66,8 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, onClose }: Si
         </button>
 
         {/* Professional Logo Icon representation */}
-<div className="w-32 h-32 mx-auto bg-white/5 border-2 border-secondary/30 flex items-center justify-center p-3 mb-3 shadow-inner relative overflow-hidden group">
+<div className="w-32 h-32 mx-auto flex items-center justify-center mb-3 relative overflow-hidden group">
+
   <div className="absolute inset-0 bg-secondary/5 group-hover:bg-secondary/10 transition-colors" />
   <span className="font-display font-black text-secondary text-2xl tracking-tight z-10">AL-FURQAN</span>
 </div>
