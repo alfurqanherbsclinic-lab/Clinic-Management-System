@@ -662,65 +662,104 @@ export default function PatientsView({ selectedPatient, filteredPatients, setSel
           </div>
 
           {/* QR Code section */}
-          <div className="border-t-2 border-dashed border-primary/20 pt-3 flex items-center justify-between">
-            <div className="text-left space-y-0.5">
-              <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Scan kwa Utambuzi</p>
-              <p className="text-[9px] text-secondary font-black tracking-widest uppercase">Siri & Usalama</p>
-              <p className="text-[8px] text-primary font-bold">Chini ya: Dr. Khalifa Rehani</p>
-              {selectedPatient.fingerprintPlaceholder && (
-                <span className="inline-flex items-center gap-1 text-[8px] text-emerald-700 font-extrabold bg-emerald-50 border border-emerald-200 px-1 rounded">
-                  <Fingerprint className="w-2.5 h-2.5" /> Biometric Secured
-                </span>
-              )}
-            </div>
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${selectedPatient.cardNumber}`}
-              alt="QR"
-              className="w-12 h-12 p-0.5 bg-white border border-primary rounded shadow-inner"
-            />
+                    <div className="border-t-2 border-dashed border-primary/20 pt-3 flex items-center justify-between">
+                      <div className="text-left space-y-0.5">
+                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Scan kwa Utambuzi</p>
+                        <p className="text-[9px] text-secondary font-black tracking-widest uppercase">Siri & Usalama</p>
+                        <p className="text-[8px] text-primary font-bold">Chini ya: Dr. Khalifa Rehani</p>
+                        {selectedPatient.fingerprintPlaceholder && (
+                          <span className="inline-flex items-center gap-1 text-[8px] text-emerald-700 font-extrabold bg-emerald-50 border border-emerald-200 px-1 rounded">
+                            <Fingerprint className="w-2.5 h-2.5" /> Biometric Secured
+                          </span>
+                        )}
+                      </div>
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${selectedPatient.cardNumber}`}
+                        alt="QR"
+                        className="w-12 h-12 p-0.5 bg-white border border-primary rounded shadow-inner"
+                      />
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Printable Action Keys */}
+                <div className="mt-4 flex flex-col gap-2 w-full max-w-[320px]">
+                  <button
+                    onClick={() => window.print()}
+                    className="p-3 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Chapisha Kadi Sasa (A4 / Card Ready)
+                  </button>
+                  <button
+                    onClick={() => {
+                      alert("Picha ya kadi imeandaliwa! Inajumuisha layout ya plastic-card, tayari kwa kutumwa moja kwa moja kwa WhatsApp.");
+                    }}
+                    className="p-3 bg-[#25D366] hover:bg-[#1ebd59] text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Mail className="w-4 h-4" />
+                    Tuma Kadi kwa WhatsApp / Barua Pepe
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500 font-semibold py-12">Sajili mgonjwa kwanza ili uone kadi yake hapa.</p>
+            )}
           </div>
 
-          {/* Printable Action Keys */}
-          <div className="mt-4 flex flex-col gap-2 w-full max-w-[320px]">
-            <button
-              onClick={() => window.print()}
-              className="p-3 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <Printer className="w-4 h-4" />
-              Chapisha Kadi Sasa (A4 / Card Ready)
-            </button>
-            <button
-              onClick={() => alert("Tayari kwa WhatsApp")}
-              className="p-3 bg-[#25D366] hover:bg-[#1ebd59] text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <Mail className="w-4 h-4" />
-              Tuma Kadi kwa WhatsApp
-            </button>
-          </div>
-        </div>
-      ) : (
-        <p className="text-xs text-gray-500 font-semibold py-12 text-center">Sajili mgonjwa kwanza ili uone kadi yake hapa.</p>
-      )}
-
-      {/* Quick lookup list */}
-      <div className="border-t pt-4">
-        <h4 className="text-xs font-bold text-primary uppercase tracking-wider mb-3 flex items-center justify-between">
-          Wagonjwa Waliopo <span>({filteredPatients.length})</span>
-          <FileText className="w-4 h-4" />
-        </h4>
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {filteredPatients.map((p) => (
-            <div
-              key={p.id}
-              onClick={() => setSelectedPatient(p)}
-              className={`p-3 rounded-lg border-2 transition-all cursor-pointer flex items-center justify-between gap-2 ${selectedPatient?.id === p.id ? 'bg-secondary/10 border-secondary' : 'bg-white border-primary/10'}`}
-            >
-              <span className="font-bold text-xs text-primary">{p.name}</span>
-              <span className="text-[10px] text-gray-500 font-mono">{p.phone}</span>
+          {/* Quick lookup list of recently registered patients */}
+          <div className="bg-white p-4 rounded-xl border-2 border-primary shadow-sm space-y-3">
+            <h4 className="text-xs font-bold text-primary font-display uppercase tracking-wider flex items-center justify-between">
+              <span>Wagonjwa Waliopo ({patients.length})</span>
+              <FileText className="w-4 h-4 text-secondary" />
+            </h4>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {filteredPatients.map((p) => (
+                <div
+                  key={p.id}
+                  onClick={() => setSelectedPatient(p)}
+                  className={`p-3 rounded-lg border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                    selectedPatient?.id === p.id 
+                      ? "bg-secondary/10 border-secondary" 
+                      : "bg-light-bg hover:bg-gray-200 border-primary/15"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <img
+                      src={p.photoUrl}
+                      alt={p.name}
+                      className="w-8 h-8 rounded-full object-cover border border-primary/20"
+                    />
+                    <div>
+                      <p className="text-xs font-bold text-primary leading-tight uppercase line-clamp-1">{p.name}</p>
+                      <p className="text-[10px] text-secondary font-mono font-bold mt-0.5">{p.cardNumber} • {p.phone}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Je, una uhakika unataka kufuta taarifa za ${p.name}?`)) {
+                        onDeletePatient(p.id);
+                        if (selectedPatient?.id === p.id) {
+                          setSelectedPatient(patients[0] || null);
+                        }
+                      }
+                    }}
+                    className="p-1.5 text-primary hover:text-secondary hover:bg-secondary/10 rounded transition-colors"
+                    title="Futa Mgonjwa"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
         </div>
+
       </div>
+
     </div>
   );
 }
