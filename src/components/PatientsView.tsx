@@ -578,11 +578,12 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                 <div className="patient-card w-[320px] bg-white border-2 border-primary rounded-2xl shadow-xl overflow-hidden text-center pb-4 select-none">
                   
                   {/* Top Header Row with Clinic Title & Logo */}
-                  <div className="w-12 h-12 flex items-center justify-center">
-  <img src="/taaag3.png" alt="Logo" className="w-full h-full object-contain" />
-</div>
-                  <div className="text-left leading-tight">
-                      <h2 className="text-sm font-black font-display text-primary tracking-tight">A-lfurqan HerbsClinic</h2>
+                  <div className="bg-white p-3 border-b-2 border-primary flex items-center justify-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full bg-secondary/10 flex items-center justify-center border border-secondary/20">
+                      <span className="font-display font-black text-secondary text-xs">ALF</span>
+                    </div>
+                    <div className="text-left leading-tight">
+                      <h2 className="text-sm font-black font-display text-primary tracking-tight">AL-FURQAN CLINIC</h2>
                       <p className="text-[9px] text-secondary font-bold uppercase tracking-wider">Tiba Asili na Sunnah</p>
                     </div>
                   </div>
@@ -629,39 +630,8 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                         <span className="font-bold text-secondary font-mono">{selectedPatient.bloodGroup} / {selectedPatient.bmi}</span>
                       </div>
                     </div>
-import React from 'react';
-import { Printer, Mail, Fingerprint, FileText } from 'lucide-react';
 
-export default function PatientsView({ selectedPatient, filteredPatients, setSelectedPatient }) {
-  return (
-    <div className="bg-white p-4 rounded-xl border-2 border-primary shadow-sm space-y-3">
-      {selectedPatient ? (
-        <div className="space-y-4">
-          {/* Patient Details */}
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-primary opacity-70">MRN:</span>
-              <span className="font-bold text-primary font-mono">{selectedPatient.mrn}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-primary opacity-70">Age / Jinsia:</span>
-              <span className="font-bold text-primary font-mono">{selectedPatient.age} Yrs / {selectedPatient.gender}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-primary opacity-70">Simu ya Mgonjwa:</span>
-              <span className="font-bold text-primary font-mono">{selectedPatient.phone}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-primary opacity-70">Location:</span>
-              <span className="font-bold text-primary truncate max-w-[150px]">{selectedPatient.address}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-primary opacity-70">Blood Group / BMI:</span>
-              <span className="font-bold text-secondary font-mono">{selectedPatient.bloodGroup} / {selectedPatient.bmi}</span>
-            </div>
-          </div>
-
-          {/* QR Code section */}
+                    {/* QR Code section */}
                     <div className="border-t-2 border-dashed border-primary/20 pt-3 flex items-center justify-between">
                       <div className="text-left space-y-0.5">
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Scan kwa Utambuzi</p>
@@ -763,3 +733,4 @@ export default function PatientsView({ selectedPatient, filteredPatients, setSel
     </div>
   );
 }
+
