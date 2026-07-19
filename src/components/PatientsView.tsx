@@ -630,7 +630,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                       </div>
                     </div>
 
-                    {/* QR Code section */}
+                                        {/* QR Code section */}
                     <div className="border-t-2 border-dashed border-primary/20 pt-3 flex items-center justify-between">
                       <div className="text-left space-y-0.5">
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Scan kwa Utambuzi</p>
@@ -652,30 +652,28 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
 
                 </div>
 
-                                  {/* Printable Action Keys */}
-                  <div className="mt-4 flex flex-col gap-2 w-full max-w-[320px]">
-                    <button
-                      onClick={() => window.print()}
-                      className="p-3 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
-                    >
-
+                {/* Printable Action Keys */}
+                <div className="mt-4 flex flex-col gap-2 w-full max-w-[320px]">
+                  <button
+                    onClick={() => window.print()}
+                    className="p-3 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
                     <Printer className="w-4 h-4" />
                     Chapisha Kadi Sasa (A4 / Card Ready)
                   </button>
                   <button
-                    onClick={() => {
-                      alert("Picha ya kadi imeandaliwa! Inajumuisha layout ya plastic-card, tayari kwa kutumwa moja kwa moja kwa WhatsApp.");
-                    }}
+                    onClick={() => alert("Tayari kwa WhatsApp")}
                     className="p-3 bg-[#25D366] hover:bg-[#1ebd59] text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
                   >
                     <Mail className="w-4 h-4" />
-                    Tuma Kadi kwa WhatsApp / Barua Pepe
+                    Tuma Kadi kwa WhatsApp
                   </button>
                 </div>
               </div>
             ) : (
               <p className="text-xs text-gray-500 font-semibold py-12">Sajili mgonjwa kwanza ili uone kadi yake hapa.</p>
             )}
+
           </div>
 
           {/* Quick lookup list of recently registered patients */}
