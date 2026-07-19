@@ -652,12 +652,13 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
 
                 </div>
 
-                {/* Printable Action Keys */}
-                <div className="mt-4 flex flex-col gap-2 w-full max-w-[320px]">
-                  <button
-                    onClick={() => window.print()}
-                    className="p-3 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  >
+                                  {/* Printable Action Keys */}
+                  <div className="mt-4 flex flex-col gap-2 w-full max-w-[320px]">
+                    <button
+                      onClick={() => window.print()}
+                      className="p-3 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    >
+
                     <Printer className="w-4 h-4" />
                     Chapisha Kadi Sasa (A4 / Card Ready)
                   </button>
