@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   UserPlus, 
   Search, 
@@ -9,8 +9,11 @@ import {
   Trash2, 
   AlertTriangle, 
   Mail, 
-  FileText
+  FileText,
+  Upload,
+  Download
 } from "lucide-react";
+import { toPng } from "html-to-image";
 import { Patient } from "../types";
 
 interface PatientAvatarProps {
@@ -96,6 +99,74 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
   const [aiStatus, setAiStatus] = useState("");
   const [cameraActive, setCameraActive] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(patients[0] || null);
+  
+  // Track if we are viewing the Form Preview or Selected Patient
+  const [activePreviewMode, setActivePreviewMode] = useState<"form" | "selected">("form");
+
+  // React ref for printable card capture
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Computed live patient for instant automatic card writing
+  const livePatient: Patient = {
+    id: "PREVIEW-ID",
+    cardNumber: `AHC-${(patients.length + 1).toString().padStart(3, "0")}`,
+    mrn: `MRN-2026-${(patients.length + 1).toString().padStart(4, "0")}`,
+    name: name.toUpperCase() || "JINA LA MGONJWA",
+    phone: phone || "07XXXXXXXX",
+    age: parseInt(age) || 0,
+    gender: gender,
+    address: address || "ANWANI YA MGONJWA",
+    photoUrl: photoUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80&fm=png",
+    fingerprintPlaceholder: fingerprintEnabled,
+    emergencyContact: {
+      name: emergencyName || "N/A",
+      phone: emergencyPhone || "N/A",
+      relation: emergencyRelation
+    },
+    occupation: occupation || "N/A",
+    religion,
+    nationality,
+    bloodGroup,
+    weight: parseFloat(weight) || 0,
+    height: parseFloat(height) || 0,
+    bmi: bmi || 0,
+    email: email || "N/A",
+    insurance: {
+      hasInsurance,
+      provider: insuranceProvider,
+      policyNumber: insurancePolicy
+    },
+    paymentMethod,
+    referralSource,
+    guardian,
+    maritalStatus,
+    nextOfKin: nextOfKin || (emergencyName ? `${emergencyName} (${emergencyRelation})` : "N/A"),
+    registrationDate: new Date().toISOString().split("T")[0]
+  };
+
+  // Switch preview mode automatically to "form" when user starts typing or edits fields
+  useEffect(() => {
+    if (name.trim() || phone.trim() || age.trim() || address.trim()) {
+      setActivePreviewMode("form");
+    }
+  }, [name, phone, age, gender, address, photoUrl, fingerprintEnabled, bloodGroup, weight, height, bmi]);
+
+  // Upload custom PNG/JPG images
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        alert("Tafadhali chagua faili la picha pekee (PNG, JPG, n.k.)");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoUrl(reader.result as string);
+        setActivePreviewMode("form");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Automatic calculation of BMI when weight or height updates
   useEffect(() => {
@@ -138,6 +209,38 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
       cardNumber: `AHC-${pad(nextIdNum, 3)}`,
       mrn: `MRN-2026-${pad(nextIdNum, 4)}`
     };
+  };
+
+  // Download active patient card as PNG
+  const downloadCardAsPng = () => {
+    if (!cardRef.current) {
+      alert("Kadi haikupatikana katika ukurasa!");
+      return;
+    }
+
+    const activePatient = activePreviewMode === "form" ? livePatient : selectedPatient;
+    const currentPatientName = activePatient?.name || "Mgonjwa";
+    const filename = `KADI_PREMIUM_${currentPatientName.replace(/\s+/g, "_").toUpperCase()}.png`;
+
+    toPng(cardRef.current, {
+      cacheBust: true,
+      backgroundColor: "#ffffff",
+      pixelRatio: 2,
+      style: {
+        transform: "scale(1)",
+        margin: "0 auto",
+      }
+    })
+    .then((dataUrl) => {
+      const link = document.createElement("a");
+      link.download = filename;
+      link.href = dataUrl;
+      link.click();
+    })
+    .catch((err) => {
+      console.error("Error generating card image:", err);
+      alert("Kuna tatizo lilitokea wakati wa kupakua kadi. Tafadhali jaribu tena.");
+    });
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -183,6 +286,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
 
     onAddPatient(newPatient);
     setSelectedPatient(newPatient);
+    setActivePreviewMode("selected");
 
     // Reset Form Fields
     setName("");
@@ -563,6 +667,21 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                   <div className="flex gap-2 flex-wrap w-full sm:w-auto">
                     <button
                       type="button"
+                      onClick={() => document.getElementById("photo-file-upload")?.click()}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Weka Picha (PNG/JPG)
+                    </button>
+                    <input
+                      type="file"
+                      id="photo-file-upload"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
                       onClick={toggleCamera}
                       className="px-3.5 py-2 bg-primary hover:bg-secondary text-white font-bold text-xs rounded flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
@@ -612,12 +731,177 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
         {/* Right 1 Column: Live Premium Printable Patient Card Preview */}
         <div className="space-y-4">
           <div className="bg-white p-4 rounded-xl border-2 border-primary shadow-sm text-center">
-            <h4 className="text-xs font-bold text-secondary uppercase tracking-widest mb-3 flex items-center justify-center gap-2">
-              <Sparkles className="w-4 h-4 text-secondary animate-pulse" />
-              HAKIKI KADI YA PREMIUM (PATIENT DIGITAL BADGE)
-            </h4>
+            {/* Mode selection tabs */}
+            <div className="flex bg-slate-100 p-1 rounded-lg mb-4 border border-primary/10">
+              <button
+                type="button"
+                onClick={() => setActivePreviewMode("form")}
+                className={`flex-1 py-2 text-xs font-bold rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  activePreviewMode === "form"
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-primary hover:bg-slate-200"
+                }`}
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                </span>
+                Preview ya Fomu (Live)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (patients.length > 0) {
+                    setActivePreviewMode("selected");
+                    if (!selectedPatient) {
+                      setSelectedPatient(patients[0]);
+                    }
+                  } else {
+                    alert("Hakuna wagonjwa waliosajiliwa bado! Tafadhali sajili mgonjwa kwanza.");
+                  }
+                }}
+                className={`flex-1 py-2 text-xs font-bold rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  activePreviewMode === "selected"
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-primary hover:bg-slate-200"
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Mgonjwa Aliyeteuliwa
+              </button>
+            </div>
 
-            {selectedPatient ? (
+            {(() => {
+              const activePatient = activePreviewMode === "form" ? livePatient : selectedPatient;
+              if (!activePatient) {
+                return (
+                  <p className="text-xs text-gray-500 font-semibold py-12">
+                    Sajili mgonjwa kwanza au anza kuandika katika fomu ili uone kadi yake hapa.
+                  </p>
+                );
+              }
+
+              return (
+                <div className="flex flex-col items-center">
+                  {/* The Premium Printable Patient Card Element */}
+                  <div 
+                    ref={cardRef} 
+                    className="patient-card w-[320px] bg-white border-2 border-primary rounded-2xl shadow-xl overflow-hidden text-center pb-4 select-none"
+                  >
+                    
+                    {/* Top Header Row with Clinic Title & Logo */}
+                    <div className="bg-white p-2.5 border-b-2 border-primary flex items-center justify-center">
+                      <img
+                        src="/taaag3.png"
+                        alt="Clinic Logo"
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        className="h-12 w-auto object-contain max-w-[180px] rounded-none transition-all duration-300 hover:scale-105"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    </div>
+
+                    {/* Gradient Backed Photo Wrapper */}
+                    <div className="bg-gradient-to-br from-primary to-[#1c4e6b] h-20 relative border-b-4 border-secondary flex justify-center items-center">
+                      <PatientAvatar
+                        src={activePatient.photoUrl}
+                        name={activePatient.name}
+                        className="w-20 h-20 rounded-full border-3 border-white object-cover shadow-md absolute bottom-[-40px] left-1/2 -translate-x-1/2 z-10"
+                        fallbackSizeClass="w-20 h-20 text-xl absolute bottom-[-40px] left-1/2 -translate-x-1/2 z-10"
+                      />
+                    </div>
+
+                    {/* Body Content */}
+                    <div className="px-6 pt-12 pb-3 text-center space-y-3">
+                      <div>
+                        <h3 className="text-base font-extrabold text-primary font-display tracking-tight uppercase line-clamp-1">
+                          {activePatient.name}
+                        </h3>
+                        <span className="inline-block bg-secondary/5 border border-secondary/20 rounded-full px-3 py-0.5 text-[10px] font-extrabold text-secondary mt-1 font-mono uppercase tracking-widest">
+                          {activePatient.cardNumber}
+                        </span>
+                      </div>
+
+                      <div className="border-t-2 border-dashed border-primary/20 pt-3 text-left space-y-1.5 text-xs font-semibold text-gray-700">
+                        <div className="flex justify-between">
+                          <span className="text-primary opacity-70">MRN:</span>
+                          <span className="font-bold text-primary font-mono">{activePatient.mrn}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-primary opacity-70">Age / Jinsia:</span>
+                          <span className="font-bold text-primary">{activePatient.age} Yrs / {activePatient.gender}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-primary opacity-70">Simu ya Mgonjwa:</span>
+                          <span className="font-bold text-primary font-mono">{activePatient.phone}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-primary opacity-70">Location:</span>
+                          <span className="font-bold text-primary truncate max-w-[150px]">{activePatient.address}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-primary opacity-70">Blood Group / BMI:</span>
+                          <span className="font-bold text-secondary font-mono">{activePatient.bloodGroup} / {activePatient.bmi}</span>
+                        </div>
+                      </div>
+
+                      {/* QR Code section */}
+                      <div className="border-t-2 border-dashed border-primary/20 pt-3 flex items-center justify-between">
+                        <div className="text-left space-y-0.5">
+                          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Scan kwa Utambuzi</p>
+                          <p className="text-[9px] text-secondary font-black tracking-widest uppercase">Siri & Usalama</p>
+                          <p className="text-[8px] text-primary font-bold">Chini ya: Dr. Khalifa Rehani</p>
+                          {activePatient.fingerprintPlaceholder && (
+                            <span className="inline-flex items-center gap-1 text-[8px] text-emerald-700 font-extrabold bg-emerald-50 border border-emerald-200 px-1 rounded">
+                              <Fingerprint className="w-2.5 h-2.5" /> Biometric Secured
+                            </span>
+                          )}
+                        </div>
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${activePatient.cardNumber}`}
+                          alt="QR"
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                          className="w-12 h-12 p-0.5 bg-white border border-primary rounded shadow-inner"
+                        />
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Printable Action Keys */}
+                  <div className="mt-4 flex flex-col gap-2 w-full max-w-[320px]">
+                    <button
+                      onClick={downloadCardAsPng}
+                      className="p-3 bg-secondary hover:bg-primary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow hover:shadow-lg"
+                    >
+                      <Download className="w-4 h-4" />
+                      Pakua Kadi (Saves PNG to Gallery/Device)
+                    </button>
+                    <button
+                      onClick={() => window.print()}
+                      className="p-3 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    >
+                      <Printer className="w-4 h-4" />
+                      Chapisha Kadi Sasa (A4 / Card Ready)
+                    </button>
+                    <button
+                      onClick={() => {
+                        alert("Picha ya kadi imeandaliwa! Inajumuisha layout ya plastic-card, tayari kwa kutumwa moja kwa moja kwa WhatsApp au Email.");
+                      }}
+                      className="p-3 bg-[#25D366] hover:bg-[#1ebd59] text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    >
+                      <Mail className="w-4 h-4" />
+                      Tuma Kadi kwa WhatsApp / Barua Pepe
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+            {/* OLD_CARD_END */}
+            {false && selectedPatient ? (
               <div className="flex flex-col items-center">
                 {/* 1. The Premium Printable Patient Card Element */}
                 <div className="patient-card w-[320px] bg-white border-2 border-primary rounded-2xl shadow-xl overflow-hidden text-center pb-4 select-none">
@@ -737,7 +1021,10 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
               {filteredPatients.map((p) => (
                 <div
                   key={p.id}
-                  onClick={() => setSelectedPatient(p)}
+                  onClick={() => {
+                    setSelectedPatient(p);
+                    setActivePreviewMode("selected");
+                  }}
                   className={`p-3 rounded-lg border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
                     selectedPatient?.id === p.id 
                       ? "bg-secondary/10 border-secondary" 
@@ -782,4 +1069,4 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
 
     </div>
   );
-}
+      }
