@@ -22,13 +22,14 @@ function PatientAvatar({ src, name, className = "w-20 h-20 rounded-full border-3
     setHasError(false);
   }, [src]);
 
-  const initials = name
-    .trim()
-    .split(/\s+/)
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  const initials = (name || "")
+  .trim()
+  .split(/\s+/)
+  .filter(Boolean)
+  .map((n) => n[0])
+  .slice(0, 2)
+  .join("")
+  .toUpperCase();
 
   if (hasError || !src) {
     return (
