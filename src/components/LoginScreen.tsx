@@ -106,12 +106,13 @@ export default function LoginScreen({ onLoginSuccess, initialAttempts, onIncreme
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/5 rounded-full -ml-12 -mb-12 pointer-events-none" />
 
         <div className="text-center mb-6">
-          {/* Logo fallback to clean typography if image fails */}
+                    {/* Logo image - free/transparent */}
           <div className="flex justify-center mb-3">
-            <div className="w-24 h-24 rounded-full bg-light-bg border border-primary/20 flex items-center justify-center p-2 shadow-inner">
-              <span className="font-display font-bold text-secondary text-2xl tracking-tighter">AL-FURQAN</span>
+            <div className="flex items-center justify-center">
+              <img src="/taaag3.png" alt="Al-Furqan Logo" className="w-32 h-auto object-contain" />
             </div>
           </div>
+
           <h2 className="text-2xl font-bold font-display text-primary tracking-tight">AL-FURQAN HERB'S CLINIC</h2>
           <p className="text-xs text-secondary font-bold tracking-widest uppercase mt-1">Hospital Information System (HIS)</p>
           <div className="mt-2 text-[11px] text-gray-500 font-mono">
