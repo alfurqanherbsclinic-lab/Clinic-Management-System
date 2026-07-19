@@ -578,10 +578,10 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                 <div className="patient-card w-[320px] bg-white border-2 border-primary rounded-2xl shadow-xl overflow-hidden text-center pb-4 select-none">
                   
                   {/* Top Header Row with Clinic Title & Logo */}
-                  <div className="bg-white p-3 border-b-2 border-primary flex items-center justify-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full bg-secondary/10 flex items-center justify-center border border-secondary/20">
-                      <span className="font-display font-black text-secondary text-xs">ALF</span>
-                    </div>
+                  <div className="w-12 h-12 flex items-center justify-center">
+  <img src="/taaag3.png" alt="Logo" className="w-full h-full object-contain" />
+</div>
+
                     <div className="text-left leading-tight">
                       <h2 className="text-sm font-black font-display text-primary tracking-tight">AL-FURQAN CLINIC</h2>
                       <p className="text-[9px] text-secondary font-bold uppercase tracking-wider">Tiba Asili na Sunnah</p>
