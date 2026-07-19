@@ -1,20 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  UserPlus, 
-  Search, 
-  Printer, 
-  Camera, 
-  Fingerprint, 
-  Sparkles, 
-  Trash2, 
-  AlertTriangle, 
-  Mail, 
-  FileText,
-  Upload,
-  Download
-} from "lucide-react";
 import { toPng } from "html-to-image";
+import { 
+  PlusCircle, Search, Trash2, Printer, Download, Sparkles, 
+  Upload, Camera, Check, AlertCircle, Fingerprint, Mail, FileText 
+} from "lucide-react";
 import { Patient } from "../types";
+
+// (Kazi zote zimeandaliwa kwa usalama wa ujenzi wa A4 / Plastic-Card ya Dr. Khalifa)
 
 interface PatientAvatarProps {
   src: string;
