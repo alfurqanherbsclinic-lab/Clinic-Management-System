@@ -1,19 +1,15 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   UserPlus, 
   Search, 
   Printer, 
-  Download, 
   Camera, 
   Fingerprint, 
   Sparkles, 
   Trash2, 
   AlertTriangle, 
   Mail, 
-  FileText, 
-  User, 
-  Activity,
-  HeartHandshake
+  FileText
 } from "lucide-react";
 import { Patient } from "../types";
 
@@ -81,6 +77,13 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
       setDuplicateAlert(false);
     }
   }, [name, patients]);
+
+  // Sync selected patient if patients list changes and none is selected
+  useEffect(() => {
+    if (!selectedPatient && patients.length > 0) {
+      setSelectedPatient(patients[0]);
+    }
+  }, [patients, selectedPatient]);
 
   // Generate Automatic Patient IDs, MRNs, and Card Numbers
   const generateAutomaticIDs = () => {
@@ -241,7 +244,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold"
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold animate-none"
                     placeholder="Mf. Juma Shaban"
                   />
                 </div>
@@ -362,7 +365,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                 </div>
                 <div className="flex flex-col">
                   <label className="text-xs font-bold text-primary mb-1">BMI (Computed)</label>
-                  <div className="p-2.5 bg-light-bg border-2 border-primary/30 rounded-lg text-xs font-bold text-primary font-mono text-center">
+                  <div className="p-2.5 bg-gray-50 border-2 border-primary/30 rounded-lg text-xs font-bold text-primary font-mono text-center">
                     {bmi > 0 ? bmi : "0.0"} ({bmi > 0 && bmi < 18.5 ? "Underweight" : bmi >= 18.5 && bmi < 25 ? "Normal" : bmi >= 25 && bmi < 30 ? "Overweight" : bmi >= 30 ? "Obese" : "N/A"})
                   </div>
                 </div>
@@ -502,12 +505,13 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
               </div>
 
               {/* Photo upload / Camera capture options */}
-              <div className="bg-light-bg p-4 rounded-lg border-2 border-dashed border-primary/30 space-y-3">
+              <div className="bg-gray-50 p-4 rounded-lg border-2 border-dashed border-primary/30 space-y-3">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <img
                       src={photoUrl}
                       alt="Preview"
+                      referrerPolicy="no-referrer"
                       className="w-14 h-14 rounded-full border-2 border-secondary object-cover"
                     />
                     <div>
@@ -577,11 +581,18 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                 {/* 1. The Premium Printable Patient Card Element */}
                 <div className="patient-card w-[320px] bg-white border-2 border-primary rounded-2xl shadow-xl overflow-hidden text-center pb-4 select-none">
                   
-                  {/* Top Header Row with Clinic Title & Logo */}
+                  {/* Top Header Row with Clinic Title & Logo (COMPLETELY UNROUNDED AND WITH IMAGE) */}
                   <div className="bg-white p-3 border-b-2 border-primary flex items-center justify-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full bg-secondary/10 flex items-center justify-center border border-secondary/20">
-                      <span className="font-display font-black text-secondary text-xs">ALF</span>
-                    </div>
+                    <img
+                      src="/taaag3.png"
+                      alt="Clinic Logo"
+                      referrerPolicy="no-referrer"
+                      className="h-9 w-auto object-contain max-w-[50px] rounded-none"
+                      onError={(e) => {
+                        // Soft elegant backup visual if taaag3.png isn't loaded yet
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
                     <div className="text-left leading-tight">
                       <h2 className="text-sm font-black font-display text-primary tracking-tight">AL-FURQAN CLINIC</h2>
                       <p className="text-[9px] text-secondary font-bold uppercase tracking-wider">Tiba Asili na Sunnah</p>
@@ -593,6 +604,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                     <img
                       src={selectedPatient.photoUrl || photoUrl}
                       alt={selectedPatient.name}
+                      referrerPolicy="no-referrer"
                       className="w-20 h-20 rounded-full border-3 border-white object-cover shadow-md absolute bottom-[-40px] left-1/2 -translate-x-1/2 z-10"
                     />
                   </div>
@@ -646,6 +658,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                       <img
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${selectedPatient.cardNumber}`}
                         alt="QR"
+                        referrerPolicy="no-referrer"
                         className="w-12 h-12 p-0.5 bg-white border border-primary rounded shadow-inner"
                       />
                     </div>
@@ -664,7 +677,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                   </button>
                   <button
                     onClick={() => {
-                      alert("Picha ya kadi imeandaliwa! Inajumuisha layout ya plastic-card, tayari kwa kutumwa moja kwa moja kwa WhatsApp.");
+                      alert("Picha ya kadi imeandaliwa! Inajumuisha layout ya plastic-card, tayari kwa kutumwa moja kwa moja kwa WhatsApp au Email.");
                     }}
                     className="p-3 bg-[#25D366] hover:bg-[#1ebd59] text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
                   >
@@ -692,13 +705,14 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                   className={`p-3 rounded-lg border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
                     selectedPatient?.id === p.id 
                       ? "bg-secondary/10 border-secondary" 
-                      : "bg-light-bg hover:bg-gray-200 border-primary/15"
+                      : "bg-gray-50 hover:bg-gray-200 border-primary/15"
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
                     <img
                       src={p.photoUrl}
                       alt={p.name}
+                      referrerPolicy="no-referrer"
                       className="w-8 h-8 rounded-full object-cover border border-primary/20"
                     />
                     <div>
@@ -732,5 +746,4 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
 
     </div>
   );
-}
-
+              }
