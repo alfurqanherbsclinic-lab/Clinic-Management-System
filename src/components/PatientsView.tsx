@@ -13,6 +13,47 @@ import {
 } from "lucide-react";
 import { Patient } from "../types";
 
+interface PatientAvatarProps {
+  src: string;
+  name: string;
+  className?: string;
+  fallbackSizeClass?: string;
+}
+
+function PatientAvatar({ src, name, className = "w-20 h-20 rounded-full border-3 border-white object-cover shadow-md", fallbackSizeClass = "w-20 h-20 text-xl" }: PatientAvatarProps) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  if (hasError || !src) {
+    return (
+      <div className={`${fallbackSizeClass} rounded-full bg-gradient-to-br from-pink-500 to-rose-600 text-white font-black flex items-center justify-center shadow-md select-none border-2 border-white`}>
+        {initials || "?"}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={name}
+      referrerPolicy="no-referrer"
+      onError={() => setHasError(true)}
+      className={className}
+    />
+  );
+}
+
 interface PatientsViewProps {
   patients: Patient[];
   onAddPatient: (newPatient: Patient) => void;
@@ -508,11 +549,11 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
               <div className="bg-gray-50 p-4 rounded-lg border-2 border-dashed border-primary/30 space-y-3">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <img
+                    <PatientAvatar
                       src={photoUrl}
-                      alt="Preview"
-                      referrerPolicy="no-referrer"
+                      name={name || "Preview"}
                       className="w-14 h-14 rounded-full border-2 border-secondary object-cover"
+                      fallbackSizeClass="w-14 h-14 text-sm"
                     />
                     <div>
                       <p className="text-xs font-bold text-primary">Picha ya Kitambulisho cha Hospitali</p>
@@ -581,31 +622,26 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                 {/* 1. The Premium Printable Patient Card Element */}
                 <div className="patient-card w-[320px] bg-white border-2 border-primary rounded-2xl shadow-xl overflow-hidden text-center pb-4 select-none">
                   
-                  {/* Top Header Row with Clinic Title & Logo (COMPLETELY UNROUNDED AND WITH IMAGE) */}
-                  <div className="bg-white p-3 border-b-2 border-primary flex items-center justify-center gap-2.5">
+                  {/* Top Header Row with Clinic Title & Logo */}
+                  <div className="bg-white p-2.5 border-b-2 border-primary flex items-center justify-center">
                     <img
                       src="/taaag3.png"
                       alt="Clinic Logo"
                       referrerPolicy="no-referrer"
-                      className="h-9 w-auto object-contain max-w-[50px] rounded-none"
+                      className="h-12 w-auto object-contain max-w-[180px] rounded-none transition-all duration-300 hover:scale-105"
                       onError={(e) => {
-                        // Soft elegant backup visual if taaag3.png isn't loaded yet
                         e.currentTarget.style.display = 'none';
                       }}
                     />
-                    <div className="text-left leading-tight">
-                      <h2 className="text-sm font-black font-display text-primary tracking-tight">AL-FURQAN CLINIC</h2>
-                      <p className="text-[9px] text-secondary font-bold uppercase tracking-wider">Tiba Asili na Sunnah</p>
-                    </div>
                   </div>
 
                   {/* Gradient Backed Photo Wrapper */}
                   <div className="bg-gradient-to-br from-primary to-[#1c4e6b] h-20 relative border-b-4 border-secondary flex justify-center items-center">
-                    <img
+                    <PatientAvatar
                       src={selectedPatient.photoUrl || photoUrl}
-                      alt={selectedPatient.name}
-                      referrerPolicy="no-referrer"
+                      name={selectedPatient.name}
                       className="w-20 h-20 rounded-full border-3 border-white object-cover shadow-md absolute bottom-[-40px] left-1/2 -translate-x-1/2 z-10"
+                      fallbackSizeClass="w-20 h-20 text-xl absolute bottom-[-40px] left-1/2 -translate-x-1/2 z-10"
                     />
                   </div>
 
@@ -709,11 +745,11 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <img
+                    <PatientAvatar
                       src={p.photoUrl}
-                      alt={p.name}
-                      referrerPolicy="no-referrer"
+                      name={p.name}
                       className="w-8 h-8 rounded-full object-cover border border-primary/20"
+                      fallbackSizeClass="w-8 h-8 text-[10px]"
                     />
                     <div>
                       <p className="text-xs font-bold text-primary leading-tight uppercase line-clamp-1">{p.name}</p>
@@ -746,4 +782,4 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
 
     </div>
   );
-      }
+}
