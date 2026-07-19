@@ -746,4 +746,4 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
 
     </div>
   );
-              }
+      }
