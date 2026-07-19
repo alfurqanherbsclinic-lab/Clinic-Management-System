@@ -630,7 +630,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                       </div>
                     </div>
 
-                                                                                {/* QR Code section */}
+                                                                                                    {/* QR Code section */}
                     <div className="border-t-2 border-dashed border-primary/20 pt-3 flex items-center justify-between">
                       <div className="text-left space-y-0.5">
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Scan kwa Utambuzi</p>
@@ -644,19 +644,18 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                       />
                     </div>
                   </div>
-                </div>
 
-                {/* Printable Action Keys */}
-                <div className="mt-4 flex flex-col gap-2 w-full max-w-[320px]">
-                  <button
-                    onClick={() => window.print()}
-                    className="p-3 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  >
-                    <Printer className="w-4 h-4" />
-                    Chapisha Kadi Sasa
-                  </button>
+                  {/* Printable Action Keys */}
+                  <div className="mt-4 flex flex-col gap-2 w-full max-w-[320px]">
+                    <button
+                      onClick={() => window.print()}
+                      className="p-3 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    >
+                      <Printer className="w-4 h-4" />
+                      Chapisha Kadi Sasa
+                    </button>
+                  </div>
                 </div>
-              </div>
             ) : (
               <p className="text-xs text-gray-500 font-semibold py-12">Sajili mgonjwa kwanza ili uone kadi yake hapa.</p>
             )}
