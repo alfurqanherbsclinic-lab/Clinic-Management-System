@@ -65,12 +65,10 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, onClose }: Si
           <X className="w-5 h-5" />
         </button>
 
-        {/* Professional Logo Icon representation */}
-<div className="w-32 h-32 mx-auto flex items-center justify-center mb-3 relative overflow-hidden group">
+                <div className="w-40 mx-auto mb-6 p-2 bg-white rounded-lg flex items-center justify-center">
+          <img src="/logo.png" alt="Al-Furqan Logo" className="w-full h-auto" />
+        </div>
 
-  <div className="absolute inset-0 bg-secondary/5 group-hover:bg-secondary/10 transition-colors" />
-  <span className="font-display font-black text-secondary text-2xl tracking-tight z-10">AL-FURQAN</span>
-</div>
 
         
         <h2 className="text-lg font-bold font-display tracking-wider uppercase text-white">TAARIFA ZA OFISI</h2>
