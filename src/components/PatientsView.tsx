@@ -630,7 +630,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                       </div>
                     </div>
 
-                                                            {/* QR Code section */}
+                                                                                {/* QR Code section */}
                     <div className="border-t-2 border-dashed border-primary/20 pt-3 flex items-center justify-between">
                       <div className="text-left space-y-0.5">
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Scan kwa Utambuzi</p>
@@ -660,6 +660,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
             ) : (
               <p className="text-xs text-gray-500 font-semibold py-12">Sajili mgonjwa kwanza ili uone kadi yake hapa.</p>
             )}
+
 
 
 
