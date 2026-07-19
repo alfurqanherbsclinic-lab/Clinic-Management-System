@@ -630,17 +630,12 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                       </div>
                     </div>
 
-                                                                                                                        {/* QR Code section */}
+                                                                                                                                            {/* QR Code section */}
                     <div className="border-t-2 border-dashed border-primary/20 pt-3 flex items-center justify-between">
                       <div className="text-left space-y-0.5">
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Scan kwa Utambuzi</p>
                         <p className="text-[9px] text-secondary font-black tracking-widest uppercase">Siri & Usalama</p>
                         <p className="text-[8px] text-primary font-bold">Chini ya: Dr. Khalifa Rehani</p>
-                        {selectedPatient.fingerprintPlaceholder && (
-                          <span className="inline-flex items-center gap-1 text-[8px] text-emerald-700 font-extrabold bg-emerald-50 border border-emerald-200 px-1 rounded">
-                            <Fingerprint className="w-2.5 h-2.5" /> Biometric Secured
-                          </span>
-                        )}
                       </div>
                       <img
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${selectedPatient.cardNumber}`}
@@ -653,25 +648,15 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
 
                 {/* Printable Action Keys */}
                 <div className="mt-4 flex flex-col gap-2 w-full max-w-[320px]">
-                  <button
-                    onClick={() => window.print()}
-                    className="p-3 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  >
-                    <Printer className="w-4 h-4" />
+                  <button onClick={() => window.print()} className="p-3 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg">
                     Chapisha Kadi Sasa
-                  </button>
-                  <button
-                    onClick={() => alert("Tayari kwa WhatsApp")}
-                    className="p-3 bg-[#25D366] hover:bg-[#1ebd59] text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  >
-                    <Mail className="w-4 h-4" />
-                    Tuma Kadi kwa WhatsApp
                   </button>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-gray-500 font-semibold py-12">Sajili mgonjwa kwanza ili uone kadi yake hapa.</p>
+              <p className="text-xs text-gray-500 font-semibold py-12">Sajili mgonjwa kwanza.</p>
             )}
+
 
 
 
