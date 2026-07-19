@@ -65,7 +65,8 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, onClose }: Si
           <X className="w-5 h-5" />
         </button>
 
-                <div className="w-40 mx-auto mb-6 p-2 bg-white rounded-lg flex items-center justify-center">
+                <div className="w-40 mx-auto mb-6 p-2 bg-transparent flex items-center justify-center">
+
           <img src="/taaag3.png" alt="Al-Furqan Logo" className="w-full h-auto" />
 
         </div>
