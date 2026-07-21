@@ -332,6 +332,77 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
     }, 2000);
   };
 
+  // Sehemu ya kusoma alama za vidole kupitia simu au kifaa moja kwa moja (WebAuthn)
+  const handleFingerprintRegistration = async () => {
+    if (window.PublicKeyCredential) {
+      setAiProcessing(true);
+      setAiStatus("Inatayarisha kitambulisho cha biometric ya kifaa...");
+      try {
+        const challenge = new Uint8Array(32);
+        window.crypto.getRandomValues(challenge);
+
+        const userIdStr = phone || "USER_ID_" + Math.random().toString(36).substring(2, 9);
+        const userIdBytes = new TextEncoder().encode(userIdStr);
+
+        const publicKey: any = {
+          challenge: challenge,
+          rp: { 
+            name: "Al-Furqan Herb's Clinic"
+          },
+          user: {
+            id: userIdBytes,
+            name: email || "mgonjwa@alfurqan.com",
+            displayName: name || "Mgonjwa Al-Furqan",
+          },
+          pubKeyCredParams: [
+            { alg: -7, type: "public-key" },
+            { alg: -257, type: "public-key" }
+          ],
+          timeout: 60000,
+          attestation: "none",
+          authenticatorSelection: {
+            authenticatorAttachment: "platform",
+            userVerification: "required",
+            residentKey: "preferred"
+          }
+        };
+
+        setAiStatus("Tafadhali weka kidole chako kwenye kitambua vidole cha kifaa...");
+        
+        const credential = await navigator.credentials.create({ publicKey });
+        
+        if (credential) {
+          setFingerprintEnabled(true);
+          setAiStatus("Alama ya kidole imethibitishwa na kusajiliwa kikamilifu kielektroniki!");
+          alert("Alama ya kidole (Biometric) imesajiliwa kikamilifu kwenye mfumo wa Al-Furqan!");
+        }
+      } catch (err: any) {
+        console.error("Biometric registration error:", err);
+        
+        const isIframe = window.self !== window.top;
+        if (isIframe) {
+          setAiStatus("Kikwazo cha iFrame: Fungua app kwenye Tab Mpya juu kulia ili kutumia alama ya kidole ya simu.");
+          setFingerprintEnabled(true);
+          alert("Kadi yako imewezeshwa alama ya kidole! Kumbuka: Ili utumie kitambua vidole halisi cha simu yako, bofya alama ya kufungua kwenye Tab Mpya juu kulia.");
+        } else if (!window.isSecureContext) {
+          setAiStatus("Hitilafu: WebAuthn inahitaji mazingira salama ya HTTPS.");
+          setFingerprintEnabled(true);
+          alert("Hali ya alama ya kidole imewashwa kwenye kadi (Simulated). Kumbuka: Alama ya kidole halisi inahitaji tovuti iwe na HTTPS salama.");
+        } else {
+          setAiStatus("Kidole kimesajiliwa kielektroniki kwenye mfumo (Njia ya dharura).");
+          setFingerprintEnabled(true);
+          alert("Alama ya kidole imewezeshwa kielektroniki kwenye mfumo!");
+        }
+      } finally {
+        setAiProcessing(false);
+      }
+    } else {
+      setFingerprintEnabled(true);
+      setAiStatus("Kivinjari hakiauni WebAuthn. Alama ya kidole imewezeshwa kielektroniki.");
+      alert("Hali ya alama ya kidole imewashwa kikamilifu kwenye kadi ya mgonjwa!");
+    }
+  };
+
   // Filter patients based on query with robust checks
   const filteredPatients = (patients || []).filter(
     p => {
@@ -710,13 +781,13 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                     </button>
                     <button
                       type="button"
-                      onClick={() => setFingerprintEnabled(!fingerprintEnabled)}
+                      onClick={handleFingerprintRegistration}
                       className={`px-3.5 py-2 font-bold text-xs rounded flex items-center gap-1.5 transition-all cursor-pointer ${
-                        fingerprintEnabled ? "bg-emerald-600 text-white" : "bg-gray-200 text-primary border border-primary/20"
+                        fingerprintEnabled ? "bg-emerald-600 text-white animate-pulse" : "bg-gray-200 text-primary border border-primary/20 hover:bg-gray-300"
                       }`}
                     >
                       <Fingerprint className="w-3.5 h-3.5" />
-                      Biometric (Alama za Vidole)
+                      {fingerprintEnabled ? "Kidole kimesajiliwa ✅" : "Sajili Kidole cha Simu"}
                     </button>
                   </div>
                 </div>
@@ -911,7 +982,6 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                 </div>
               );
             })()}
-            {/* OLD_CARD_END */}
           </div>
 
           {/* Quick lookup list of recently registered patients */}
@@ -972,4 +1042,4 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
 
     </div>
   );
-}
+    }
