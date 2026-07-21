@@ -26,11 +26,12 @@ interface BroadcastCenterProps {
 }
 
 export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
-  // Target recipient mode: "bulk" (all patients) or "single" (individual patient)
-  const [recipientMode, setRecipientMode] = useState<"bulk" | "single">("bulk");
+  // Target recipient mode: "bulk" (all patients), "single" (individual patient), or "manual" (custom daily phone numbers)
+  const [recipientMode, setRecipientMode] = useState<"bulk" | "single" | "manual">("bulk");
   const [selectedPatientId, setSelectedPatientId] = useState<string>(
     patients.length > 0 ? patients[0].id : ""
   );
+  const [manualPhoneNumbers, setManualPhoneNumbers] = useState<string>("");
 
   // Sending Channel: "oasis" (Bulk SMS Oasis Tech) or "whatsapp" (Free Direct wa.me)
   const [sendChannel, setSendChannel] = useState<"oasis" | "whatsapp">("oasis");
@@ -109,11 +110,25 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
     return cleaned;
   };
 
-  // Get active target list based on single/bulk selection
-  const getTargetPatients = (): Patient[] => {
+  // Get active target list based on single/bulk/manual selection
+  const getTargetPatients = (): { id: string; name: string; phone: string; cardNumber: string }[] => {
     if (recipientMode === "single") {
       const p = patients.find((item) => item.id === selectedPatientId);
       return p ? [p] : [];
+    }
+    if (recipientMode === "manual") {
+      const numbersArray = manualPhoneNumbers
+        .split(/[\n,;\s]+/)
+        .map((n) => n.trim())
+        .filter((n) => n.length >= 8);
+      
+      const uniqueNumbers: string[] = Array.from(new Set(numbersArray));
+      return uniqueNumbers.map((num: string, idx: number) => ({
+        id: `manual-${idx}`,
+        name: `Namba ya Siku #${idx + 1}`,
+        phone: num,
+        cardNumber: `N/A`
+      }));
     }
     return patients;
   };
@@ -121,14 +136,14 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
   const targetPatients = getTargetPatients();
   const targetCount = targetPatients.length;
 
-  // Single patient WhatsApp Direct trigger
-  const handleOpenSingleWhatsApp = (patient: Patient) => {
+  // Single patient/recipient WhatsApp Direct trigger
+  const handleOpenSingleWhatsApp = (recipient: { name: string; phone: string; cardNumber: string }) => {
     if (!messageBody.trim()) {
       alert("Tafadhali andika ujumbe kwanza kabla ya kutuma!");
       return;
     }
-    const formattedPhone = formatTanzaniaPhone(patient.phone);
-    const personalizedText = messageBody.replace(/\{JINA\}/g, patient.name).replace(/\{CARD_NO\}/g, patient.cardNumber);
+    const formattedPhone = formatTanzaniaPhone(recipient.phone);
+    const personalizedText = messageBody.replace(/\{JINA\}/g, recipient.name).replace(/\{CARD_NO\}/g, recipient.cardNumber);
     const encodedText = encodeURIComponent(personalizedText);
     const waUrl = `https://wa.me/${formattedPhone}?text=${encodedText}`;
     window.open(waUrl, "_blank", "noopener,noreferrer");
@@ -142,7 +157,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
     }
 
     if (targetPatients.length === 0) {
-      setErrorMessage("Hakuna wagonjwa waliochaguliwa kwa ajili ya kutuma ujumbe.");
+      setErrorMessage("Hakuna wagonjwa au namba zilizochaguliwa kwa ajili ya kutuma ujumbe.");
       return;
     }
 
@@ -162,7 +177,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
       const recipientPhone = formatTanzaniaPhone(patient.phone);
       const textToDeliver = messageBody.replace(/\{JINA\}/g, patient.name).replace(/\{CARD_NO\}/g, patient.cardNumber);
 
-      await new Promise((res) => setTimeout(res, 500));
+      await new Promise((res) => setTimeout(res, 600));
 
       let isSuccess = false;
       let responseDetails = "";
@@ -215,9 +230,9 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
     setIsSending(false);
     if (hasApiKey) {
-      setSuccessMessage(`Ujumbe umetumwa vyema kwa wagonjwa ${targetPatients.length} kupitia Oasis Technologies SMS Gateway!`);
+      setSuccessMessage(`Ujumbe umetumwa vyema kwa wampokeaji ${targetPatients.length} kupitia Oasis Technologies SMS Gateway!`);
     } else {
-      setSuccessMessage(`Majaribio ya utumaji wa ujumbe kwa wagonjwa ${targetPatients.length} yamekamilika! Ili kutuma SMS halisi, weka API Key ya Oasis Technologies hapo juu.`);
+      setSuccessMessage(`Majaribio ya utumaji wa ujumbe kwa wampokeaji ${targetPatients.length} yamekamilika! Ili kutuma SMS halisi, weka API Key ya Oasis Technologies hapo juu.`);
     }
   };
 
@@ -247,7 +262,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
               <span>MAWASILIANO NA BULK BROADCAST (SMS & WHATSAPP CENTER)</span>
             </h2>
             <p className="text-xs text-gray-500 font-medium mt-0.5">
-              Tuma ujumbe wa dharura, dokezo la afya na elimu ya tiba ya Sunnah kwa wagonjwa wote waliosajiliwa kwa kubofya kitufe kimoja tu.
+              Tuma ujumbe wa dharura, dokezo la afya na elimu ya tiba ya Sunnah kwa wagonjwa wote waliosajiliwa au namba za siku.
             </p>
           </div>
         </div>
@@ -267,7 +282,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
         </button>
       </div>
 
-      {/* Oasis API Settings Drawer */}
+      {/* Oasis API Settings Expandable Drawer */}
       {showApiSettings && (
         <div className="bg-amber-50/70 border-b-2 border-amber-200 p-5 space-y-4 animate-fadeIn">
           <div className="flex items-center justify-between border-b border-amber-200/60 pb-2">
@@ -288,7 +303,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
               </label>
               <input
                 type="password"
-                placeholder="Weka Oasis API Key yako hapa"
+                placeholder="Weka Oasis API Key yako hapa (mfano: oasis_live_...)"
                 value={oasisApiKey}
                 onChange={(e) => setOasisApiKey(e.target.value)}
                 className="w-full p-2.5 bg-white border-2 border-amber-300 rounded-lg text-xs font-mono font-semibold text-primary outline-none focus:border-amber-500 shadow-sm"
@@ -311,7 +326,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
                 className="w-full p-2.5 bg-white border-2 border-amber-300 rounded-lg text-xs font-mono font-bold uppercase text-primary outline-none focus:border-amber-500 shadow-sm"
               />
               <p className="text-[10px] text-gray-500">
-                Jina linaloonekana kwa mgonjwa anapopokea SMS.
+                Jina linaloonekana kwa mgonjwa anapopokea SMS (Sender ID iliyothibitishwa na Oasis).
               </p>
             </div>
           </div>
@@ -334,15 +349,16 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
       {/* Main Broadcast Control Area */}
       <div className="p-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
         
-        {/* Left 2 Columns */}
+        {/* Left 2 Columns: Form Controls */}
         <div className="xl:col-span-2 space-y-5">
           
-          {/* Target Selector */}
+          {/* Target Recipient Selector (Single vs Bulk vs Manual) */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
             <label className="text-xs font-extrabold text-primary uppercase tracking-wider block">
               CHAGUA WALENGWA (RECIPIENT TARGET)
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Option 1: All Registered Patients */}
               <button
                 type="button"
                 onClick={() => setRecipientMode("bulk")}
@@ -352,18 +368,19 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
                     : "bg-white text-gray-700 border-gray-200 hover:border-primary/40"
                 }`}
               >
-                <div className="flex items-center gap-2.5">
-                  <Users className="w-4 h-4" />
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 flex-shrink-0" />
                   <div className="text-left">
-                    <p className="font-extrabold">Tuma kwa Wengi (Bulk Broadcast)</p>
+                    <p className="font-extrabold">Wagonjwa Wote</p>
                     <p className={`text-[10px] ${recipientMode === "bulk" ? "text-white/80" : "text-gray-400"}`}>
-                      Wagonjwa wote ({patients.length}) kwenye mfumo
+                      Waliosajiliwa ({patients.length})
                     </p>
                   </div>
                 </div>
-                {recipientMode === "bulk" && <CheckCircle2 className="w-4 h-4 text-secondary" />}
+                {recipientMode === "bulk" && <CheckCircle2 className="w-4 h-4 text-secondary flex-shrink-0" />}
               </button>
 
+              {/* Option 2: Single Registered Patient */}
               <button
                 type="button"
                 onClick={() => setRecipientMode("single")}
@@ -373,23 +390,46 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
                     : "bg-white text-gray-700 border-gray-200 hover:border-primary/40"
                 }`}
               >
-                <div className="flex items-center gap-2.5">
-                  <User className="w-4 h-4" />
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 flex-shrink-0" />
                   <div className="text-left">
-                    <p className="font-extrabold">Tuma kwa Mtu Mmoja (Single)</p>
+                    <p className="font-extrabold">Mgonjwa Mmoja</p>
                     <p className={`text-[10px] ${recipientMode === "single" ? "text-white/80" : "text-gray-400"}`}>
-                      Mgonjwa mmoja mahsusi
+                      Chagua Mgonjwa
                     </p>
                   </div>
                 </div>
-                {recipientMode === "single" && <CheckCircle2 className="w-4 h-4 text-secondary" />}
+                {recipientMode === "single" && <CheckCircle2 className="w-4 h-4 text-secondary flex-shrink-0" />}
+              </button>
+
+              {/* Option 3: Manual Daily Phone Numbers */}
+              <button
+                type="button"
+                onClick={() => setRecipientMode("manual")}
+                className={`p-3 rounded-xl border-2 font-bold text-xs flex items-center justify-between transition-all cursor-pointer ${
+                  recipientMode === "manual"
+                    ? "bg-primary text-white border-primary shadow-md"
+                    : "bg-white text-gray-700 border-gray-200 hover:border-primary/40"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 flex-shrink-0" />
+                  <div className="text-left">
+                    <p className="font-extrabold">Namba za Siku</p>
+                    <p className={`text-[10px] ${recipientMode === "manual" ? "text-white/80" : "text-gray-400"}`}>
+                      Ingiza Namba Ziada
+                    </p>
+                  </div>
+                </div>
+                {recipientMode === "manual" && <CheckCircle2 className="w-4 h-4 text-secondary flex-shrink-0" />}
               </button>
             </div>
 
+            {/* Dropdown for Single Patient Mode */}
             {recipientMode === "single" && (
-              <div className="pt-2 space-y-1.5">
+              <div className="pt-2 animate-fadeIn space-y-1.5">
                 <label className="text-xs font-bold text-gray-600 block">
-                  Chagua Mgonjwa kutoka Orodha:
+                  Chagua Mgonjwa kutoka Orodha ya Mfumo:
                 </label>
                 <select
                   value={selectedPatientId}
@@ -404,15 +444,42 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
                 </select>
               </div>
             )}
+
+            {/* Textarea for Manual Daily Phone Numbers Input */}
+            {recipientMode === "manual" && (
+              <div className="pt-2 animate-fadeIn space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                    <Smartphone className="w-4 h-4 text-primary" />
+                    <span>Ingiza au Bandika Namba za Simu za Siku (Manual Numbers):</span>
+                  </label>
+                  <span className="text-[11px] font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
+                    {targetCount} Namba {targetCount === 1 ? "Iliyotambuliwa" : "Zilizotambuliwa"}
+                  </span>
+                </div>
+                <textarea
+                  rows={3}
+                  value={manualPhoneNumbers}
+                  onChange={(e) => setManualPhoneNumbers(e.target.value)}
+                  placeholder="Andika au bandika namba ukitenganisha kwa koma au mstari mpya (Mfano: 0712345678, 0789123456, 0655112233)"
+                  className="w-full p-3 bg-white border-2 border-primary/30 rounded-xl text-xs font-mono font-bold text-primary outline-none focus:border-primary shadow-sm leading-relaxed"
+                />
+                <p className="text-[10px] text-gray-500 font-medium">
+                  * Unganisha namba kwa koma (<code>,</code>) au mstari mpya. Mfumo utazitambua kiatomati bila kujali formatting.
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Channel Selection */}
+          {/* Channel Selection (Oasis SMS vs WhatsApp Free) */}
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
             <label className="text-xs font-extrabold text-primary uppercase tracking-wider block">
               NJIA YA UTUMAJI (BROADCAST GATEWAY)
             </label>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              
+              {/* Option 1: Oasis SMS */}
               <button
                 type="button"
                 onClick={() => setSendChannel("oasis")}
@@ -427,7 +494,9 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
                     <MessageSquare className="w-4 h-4 text-rose-600" />
                     <span>Bulk SMS (Oasis Technologies)</span>
                   </div>
-                  {sendChannel === "oasis" && <span className="w-2.5 h-2.5 rounded-full bg-rose-600" />}
+                  {sendChannel === "oasis" && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-600" />
+                  )}
                 </div>
                 <p className="text-[11px] text-gray-600 font-medium">
                   Inatumia salio la Oasis SMS Gateway kutuma SMS moja kwa moja.
@@ -440,6 +509,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
                 </div>
               </button>
 
+              {/* Option 2: WhatsApp Free */}
               <button
                 type="button"
                 onClick={() => setSendChannel("whatsapp")}
@@ -454,7 +524,9 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
                     <MessageCircle className="w-4 h-4 text-emerald-600" />
                     <span>WhatsApp (Bila Gharama za API)</span>
                   </div>
-                  {sendChannel === "whatsapp" && <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />}
+                  {sendChannel === "whatsapp" && (
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+                  )}
                 </div>
                 <p className="text-[11px] text-gray-600 font-medium">
                   Bure kabisa via <code className="text-emerald-700 font-bold">wa.me</code> link. Inafungua WhatsApp moja kwa moja.
@@ -464,6 +536,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
                   <span>Direct Web/App</span>
                 </div>
               </button>
+
             </div>
           </div>
 
@@ -522,7 +595,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
             </div>
           </div>
 
-          {/* Action Button */}
+          {/* Action Button Section */}
           {sendChannel === "oasis" ? (
             <button
               type="button"
@@ -545,6 +618,8 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
                   <span>
                     {recipientMode === "bulk"
                       ? `Sambaza Ujumbe kwa Wagonjwa Wote (${targetCount})`
+                      : recipientMode === "manual"
+                      ? `Sambaza Ujumbe kwa Namba za Siku (${targetCount})`
                       : `Tuma Ujumbe kwa Mgonjwa Aliyechaguliwa`}
                   </span>
                 </>
@@ -615,7 +690,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
           {/* Feedback Messages */}
           {successMessage && (
-            <div className="p-4 bg-emerald-50 border-l-4 border-emerald-600 rounded-r-xl text-xs font-bold text-emerald-900 flex items-start gap-2.5">
+            <div className="p-4 bg-emerald-50 border-l-4 border-emerald-600 rounded-r-xl text-xs font-bold text-emerald-900 flex items-start gap-2.5 animate-fadeIn">
               <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-black">UTUMAJI UMEKAMILIKA!</p>
@@ -625,7 +700,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
           )}
 
           {errorMessage && (
-            <div className="p-4 bg-rose-50 border-l-4 border-rose-600 rounded-r-xl text-xs font-bold text-rose-900 flex items-start gap-2.5">
+            <div className="p-4 bg-rose-50 border-l-4 border-rose-600 rounded-r-xl text-xs font-bold text-rose-900 flex items-start gap-2.5 animate-fadeIn">
               <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-black">TAARIFA YA HITILAFU</p>
@@ -645,8 +720,9 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
             </h3>
 
             <div className="space-y-3 text-xs font-bold">
+              
               <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
-                <span className="text-gray-500 font-semibold">Simu za Wagonjwa (Target):</span>
+                <span className="text-gray-500 font-semibold">Simu za Walengwa (Target):</span>
                 <span className="font-mono text-primary font-black bg-white px-2 py-0.5 rounded border border-slate-200">
                   {targetCount} Active Contacts
                 </span>
@@ -666,9 +742,10 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
                   ACTIVE & READY
                 </span>
               </div>
+
             </div>
 
-            {/* Oasis Credentials Preview */}
+            {/* Oasis SMS Credentials indicator */}
             <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2 text-[11px]">
               <div className="flex justify-between font-bold text-gray-700">
                 <span>Oasis Sender ID:</span>
@@ -694,7 +771,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
             </div>
           </div>
 
-          {/* Realtime Delivery Logs */}
+          {/* Sending Progress / Realtime Logs */}
           {sendingLog.length > 0 && (
             <div className="bg-white border-2 border-primary/20 p-4 rounded-2xl space-y-3">
               <h4 className="text-xs font-black text-primary uppercase tracking-wider flex items-center justify-between">
@@ -724,4 +801,4 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
     </div>
   );
-    }
+}
