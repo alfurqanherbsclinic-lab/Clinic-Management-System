@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
-import { toPng } from "html-to-image";
 import { 
-  PlusCircle, Search, Trash2, Printer, Download, Sparkles, 
-  Upload, Camera, Check, AlertCircle, Fingerprint, Mail, FileText 
+  UserPlus, 
+  Search, 
+  Printer, 
+  Camera, 
+  Fingerprint, 
+  Sparkles, 
+  Trash2, 
+  AlertTriangle, 
+  Mail, 
+  FileText,
+  Upload,
+  Download
 } from "lucide-react";
 import { Patient } from "../types";
-
-// (Kazi zote zimeandaliwa kwa usalama wa ujenzi wa A4 / Plastic-Card ya Dr. Khalifa)
 
 interface PatientAvatarProps {
   src: string;
@@ -23,13 +30,13 @@ function PatientAvatar({ src, name, className = "w-20 h-20 rounded-full border-3
   }, [src]);
 
   const initials = (name || "")
-  .trim()
-  .split(/\s+/)
-  .filter(Boolean)
-  .map((n) => n[0])
-  .slice(0, 2)
-  .join("")
-  .toUpperCase();
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
 
   if (hasError || !src) {
     return (
@@ -91,7 +98,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
   const [aiProcessing, setAiProcessing] = useState(false);
   const [aiStatus, setAiStatus] = useState("");
   const [cameraActive, setCameraActive] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(patients[0] || null);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>((patients && patients.length > 0 ? patients[0] : null));
   
   // Track if we are viewing the Form Preview or Selected Patient
   const [activePreviewMode, setActivePreviewMode] = useState<"form" | "selected">("form");
@@ -205,7 +212,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
   };
 
   // Download active patient card as PNG
-  const downloadCardAsPng = () => {
+  const downloadCardAsPng = async () => {
     if (!cardRef.current) {
       alert("Kadi haikupatikana katika ukurasa!");
       return;
@@ -215,25 +222,31 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
     const currentPatientName = activePatient?.name || "Mgonjwa";
     const filename = `KADI_PREMIUM_${currentPatientName.replace(/\s+/g, "_").toUpperCase()}.png`;
 
-    toPng(cardRef.current, {
-      cacheBust: true,
-      backgroundColor: "#ffffff",
-      pixelRatio: 2,
-      style: {
-        transform: "scale(1)",
-        margin: "0 auto",
-      }
-    })
-    .then((dataUrl) => {
-      const link = document.createElement("a");
-      link.download = filename;
-      link.href = dataUrl;
-      link.click();
-    })
-    .catch((err) => {
-      console.error("Error generating card image:", err);
-      alert("Kuna tatizo lilitokea wakati wa kupakua kadi. Tafadhali jaribu tena.");
-    });
+    try {
+      const { toPng: htmlToPng } = await import("html-to-image");
+      htmlToPng(cardRef.current, {
+        cacheBust: true,
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+        style: {
+          transform: "scale(1)",
+          margin: "0 auto",
+        }
+      })
+      .then((dataUrl) => {
+        const link = document.createElement("a");
+        link.download = filename;
+        link.href = dataUrl;
+        link.click();
+      })
+      .catch((err) => {
+        console.error("Error generating card image:", err);
+        alert("Kuna tatizo lilitokea wakati wa kupakua kadi. Tafadhali jaribu tena.");
+      });
+    } catch (err) {
+      console.error("Failed to dynamically load html-to-image:", err);
+      alert("Kifaa chako hakiauni upakuaji wa kadi kwa sasa.");
+    }
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -319,9 +332,14 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
     }, 2000);
   };
 
-  // Filter patients based on query
-  const filteredPatients = patients.filter(
-    p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.phone.includes(searchQuery)
+  // Filter patients based on query with robust checks
+  const filteredPatients = (patients || []).filter(
+    p => {
+      const pName = p && p.name ? p.name.toLowerCase() : "";
+      const pPhone = p && p.phone ? p.phone : "";
+      const q = (searchQuery || "").toLowerCase();
+      return pName.includes(q) || pPhone.includes(searchQuery || "");
+    }
   );
 
   return (
@@ -853,7 +871,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                           )}
                         </div>
                         <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${activePatient.cardNumber}`}
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(activePatient.cardNumber || "")}`}
                           alt="QR"
                           referrerPolicy="no-referrer"
                           crossOrigin="anonymous"
@@ -894,114 +912,6 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
               );
             })()}
             {/* OLD_CARD_END */}
-            {false && selectedPatient ? (
-              <div className="flex flex-col items-center">
-                {/* 1. The Premium Printable Patient Card Element */}
-                <div className="patient-card w-[320px] bg-white border-2 border-primary rounded-2xl shadow-xl overflow-hidden text-center pb-4 select-none">
-                  
-                  {/* Top Header Row with Clinic Title & Logo */}
-                  <div className="bg-white p-2.5 border-b-2 border-primary flex items-center justify-center">
-                    <img
-                      src="/taaag3.png"
-                      alt="Clinic Logo"
-                      referrerPolicy="no-referrer"
-                      className="h-12 w-auto object-contain max-w-[180px] rounded-none transition-all duration-300 hover:scale-105"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  </div>
-
-                  {/* Gradient Backed Photo Wrapper */}
-                  <div className="bg-gradient-to-br from-primary to-[#1c4e6b] h-20 relative border-b-4 border-secondary flex justify-center items-center">
-                    <PatientAvatar
-                      src={selectedPatient.photoUrl || photoUrl}
-                      name={selectedPatient.name}
-                      className="w-20 h-20 rounded-full border-3 border-white object-cover shadow-md absolute bottom-[-40px] left-1/2 -translate-x-1/2 z-10"
-                      fallbackSizeClass="w-20 h-20 text-xl absolute bottom-[-40px] left-1/2 -translate-x-1/2 z-10"
-                    />
-                  </div>
-
-                  {/* Body Content */}
-                  <div className="px-6 pt-12 pb-3 text-center space-y-3">
-                    <div>
-                      <h3 className="text-base font-extrabold text-primary font-display tracking-tight uppercase line-clamp-1">
-                        {selectedPatient.name}
-                      </h3>
-                      <span className="inline-block bg-secondary/5 border border-secondary/20 rounded-full px-3 py-0.5 text-[10px] font-extrabold text-secondary mt-1 font-mono uppercase tracking-widest">
-                        {selectedPatient.cardNumber}
-                      </span>
-                    </div>
-
-                    <div className="border-t-2 border-dashed border-primary/20 pt-3 text-left space-y-1.5 text-xs font-semibold text-gray-700">
-                      <div className="flex justify-between">
-                        <span className="text-primary opacity-70">MRN:</span>
-                        <span className="font-bold text-primary font-mono">{selectedPatient.mrn}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-primary opacity-70">Age / Jinsia:</span>
-                        <span className="font-bold text-primary">{selectedPatient.age} Yrs / {selectedPatient.gender}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-primary opacity-70">Simu ya Mgonjwa:</span>
-                        <span className="font-bold text-primary font-mono">{selectedPatient.phone}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-primary opacity-70">Location:</span>
-                        <span className="font-bold text-primary truncate max-w-[150px]">{selectedPatient.address}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-primary opacity-70">Blood Group / BMI:</span>
-                        <span className="font-bold text-secondary font-mono">{selectedPatient.bloodGroup} / {selectedPatient.bmi}</span>
-                      </div>
-                    </div>
-
-                    {/* QR Code section */}
-                    <div className="border-t-2 border-dashed border-primary/20 pt-3 flex items-center justify-between">
-                      <div className="text-left space-y-0.5">
-                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Scan kwa Utambuzi</p>
-                        <p className="text-[9px] text-secondary font-black tracking-widest uppercase">Siri & Usalama</p>
-                        <p className="text-[8px] text-primary font-bold">Chini ya: Dr. Khalifa Rehani</p>
-                        {selectedPatient.fingerprintPlaceholder && (
-                          <span className="inline-flex items-center gap-1 text-[8px] text-emerald-700 font-extrabold bg-emerald-50 border border-emerald-200 px-1 rounded">
-                            <Fingerprint className="w-2.5 h-2.5" /> Biometric Secured
-                          </span>
-                        )}
-                      </div>
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${selectedPatient.cardNumber}`}
-                        alt="QR"
-                        referrerPolicy="no-referrer"
-                        className="w-12 h-12 p-0.5 bg-white border border-primary rounded shadow-inner"
-                      />
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Printable Action Keys */}
-                <div className="mt-4 flex flex-col gap-2 w-full max-w-[320px]">
-                  <button
-                    onClick={() => window.print()}
-                    className="p-3 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  >
-                    <Printer className="w-4 h-4" />
-                    Chapisha Kadi Sasa (A4 / Card Ready)
-                  </button>
-                  <button
-                    onClick={() => {
-                      alert("Picha ya kadi imeandaliwa! Inajumuisha layout ya plastic-card, tayari kwa kutumwa moja kwa moja kwa WhatsApp au Email.");
-                    }}
-                    className="p-3 bg-[#25D366] hover:bg-[#1ebd59] text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
-                  >
-                    <Mail className="w-4 h-4" />
-                    Tuma Kadi kwa WhatsApp / Barua Pepe
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-gray-500 font-semibold py-12">Sajili mgonjwa kwanza ili uone kadi yake hapa.</p>
-            )}
           </div>
 
           {/* Quick lookup list of recently registered patients */}
