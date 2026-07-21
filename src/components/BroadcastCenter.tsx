@@ -184,7 +184,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
       if (hasApiKey) {
         try {
-          const response = await fetch("https://api.oasistech.co.tz/v1/sms/send", {
+          const response = await fetch("https://bulksms.oasistech.co.tz/api/v1/send", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
