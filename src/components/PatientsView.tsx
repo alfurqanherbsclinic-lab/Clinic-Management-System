@@ -1,70 +1,68 @@
-import React, { useState, useRef, useEffect } from "react";
-import {
-  UserPlus,
-  Search,
-  Fingerprint,
-  Sparkles,
-  Camera,
-  Trash2,
-  Printer,
+import React, { useState, useEffect, useRef } from "react";
+import { 
+  UserPlus, 
+  Search, 
+  Printer, 
+  Camera, 
+  Fingerprint, 
+  Sparkles, 
+  Trash2, 
+  AlertTriangle, 
+  Mail, 
   FileText,
-  Mail,
-  User,
-  Phone,
-  Calendar,
-  MapPin,
-  Heart,
-  Briefcase,
-  Globe,
   Upload,
-  Download
+  Download,
+  Send,
+  MessageSquare
 } from "lucide-react";
 import { Patient } from "../types";
+import BroadcastCenter from "./BroadcastCenter";
 
 interface PatientAvatarProps {
-  src?: string;
-  name?: string;
+  src: string;
+  name: string;
   className?: string;
   fallbackSizeClass?: string;
 }
 
-function PatientAvatar({ src, name, className = "", fallbackSizeClass = "w-10 h-10 text-xs" }: PatientAvatarProps) {
-  const [imageError, setImageError] = useState(false);
+function PatientAvatar({ src, name, className = "w-20 h-20 rounded-full border-3 border-white object-cover shadow-md", fallbackSizeClass = "w-20 h-20 text-xl" }: PatientAvatarProps) {
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
-    setImageError(false);
+    setHasError(false);
   }, [src]);
 
-  if (src && !imageError) {
-    return (
-      <img
-        src={src}
-        alt={name || "Avatar"}
-        className={className}
-        referrerPolicy="no-referrer"
-        crossOrigin="anonymous"
-        onError={() => setImageError(true)}
-      />
-    );
-  }
-
-  const initials = (name || "M")
+  const initials = (name || "")
+    .trim()
     .split(/\s+/)
+    .filter(Boolean)
     .map((n) => n[0])
     .slice(0, 2)
     .join("")
     .toUpperCase();
 
+  if (hasError || !src) {
+    return (
+      <div className={`${fallbackSizeClass} rounded-full bg-gradient-to-br from-pink-500 to-rose-600 text-white font-black flex items-center justify-center shadow-md select-none border-2 border-white`}>
+        {initials || "?"}
+      </div>
+    );
+  }
+
   return (
-    <div className={`${className} ${fallbackSizeClass} rounded-full bg-[#D6145A] text-white flex items-center justify-center font-bold shadow-inner border-2 border-white`}>
-      {initials}
-    </div>
+    <img
+      src={src}
+      alt={name}
+      referrerPolicy="no-referrer"
+      onError={() => setHasError(true)}
+      className={className}
+    />
   );
 }
 
 interface PatientsViewProps {
   patients: Patient[];
-  onAddPatient: (patient: Patient) => void;
+  onAddPatient: (newPatient: Patient) => void;
   onDeletePatient: (id: string) => void;
 }
 
@@ -106,6 +104,9 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
   const [cameraActive, setCameraActive] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>((patients && patients.length > 0 ? patients[0] : null));
   
+  // Track active section: "registration" or "broadcast"
+  const [activeSectionTab, setActiveSectionTab] = useState<"registration" | "broadcast">("registration");
+  
   // Track if we are viewing the Form Preview or Selected Patient
   const [activePreviewMode, setActivePreviewMode] = useState<"form" | "selected">("form");
 
@@ -114,14 +115,14 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
 
   // Computed live patient for instant automatic card writing
   const livePatient: Patient = {
-    id: "AF-NEW",
-    cardNumber: "AHC-NEW",
-    mrn: "MRN-2026-NEW",
-    name: name || "Jina la Mgonjwa",
+    id: "PREVIEW-ID",
+    cardNumber: `AHC-${(patients.length + 1).toString().padStart(3, "0")}`,
+    mrn: `MRN-2026-${(patients.length + 1).toString().padStart(4, "0")}`,
+    name: name.toUpperCase() || "JINA LA MGONJWA",
     phone: phone || "07XXXXXXXX",
-    age: parseInt(age) || 30,
-    gender,
-    address: address || "Anwani ya Mgonjwa",
+    age: parseInt(age) || 0,
+    gender: gender,
+    address: address || "ANWANI YA MGONJWA",
     photoUrl: photoUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80&fm=png",
     fingerprintPlaceholder: fingerprintEnabled,
     emergencyContact: {
@@ -133,9 +134,9 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
     religion,
     nationality,
     bloodGroup,
-    weight: parseFloat(weight) || 70,
-    height: parseFloat(height) || 1.70,
-    bmi: bmi || 24.2,
+    weight: parseFloat(weight) || 0,
+    height: parseFloat(height) || 0,
+    bmi: bmi || 0,
     email: email || "N/A",
     insurance: {
       hasInsurance,
@@ -366,12 +367,10 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
     if (uploadedFile) {
       await processPhotoWithAI(uploadedFile);
     } else {
-      // If there's no uploaded file but we have a photo, mock or prompt
       setAiProcessing(true);
       setAiStatus("AI inachakata na kukata background ya picha...");
       setTimeout(() => {
         setAiProcessing(false);
-        // Set a high-quality simulated ID photo with red-pinkish background or clear studio photo
         setPhotoUrl("https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80");
         setAiStatus("Picha imeboreshwa kwa kutumia AI na kuwekewa rangi ya ofisi (#D6145A)!");
         alert("Picha imeboreshwa kikamilifu (Simulated)! Ili uondoe background ya picha halisi ya mgonjwa kwa usahihi wa 100%, bofya 'Picha ya Mgonjwa' na uchague faili la picha kutoka kwenye kifaa chako.");
@@ -471,360 +470,431 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
   );
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       
-      {/* Search Header Row */}
-      <div className="bg-white p-4 rounded-xl border-2 border-primary shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-black text-primary font-display tracking-tight uppercase">Sajili Mgonjwa (New Patient Registration)</h2>
-          <p className="text-xs text-secondary font-bold font-sans">Jaza fomu hapa chini kutengeneza Kadi ya Premium ya Al-Furqan Clinic.</p>
+      {/* Section Navigation Tabs */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-xl border-2 border-primary/20 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveSectionTab("registration")}
+            className={`px-4 py-2.5 rounded-lg font-extrabold text-xs uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+              activeSectionTab === "registration"
+                ? "bg-primary text-white shadow-md"
+                : "bg-slate-100 text-gray-700 hover:bg-slate-200"
+            }`}
+          >
+            <UserPlus className="w-4 h-4 text-secondary" />
+            <span>USAJILI WA WAGONJWA & KADI</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSectionTab("broadcast")}
+            className={`px-4 py-2.5 rounded-lg font-extrabold text-xs uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer ${
+              activeSectionTab === "broadcast"
+                ? "bg-rose-600 text-white shadow-md"
+                : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200"
+            }`}
+          >
+            <Send className="w-4 h-4 text-rose-500" />
+            <span>SMS & WHATSAPP BROADCAST CENTER</span>
+            <span className="bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded-full font-mono font-bold ml-1">
+              OASIS & WA
+            </span>
+          </button>
         </div>
-        <div className="relative max-w-md w-full">
-          <Search className="w-4 h-4 text-primary opacity-50 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Tafuta mgonjwa kwa jina au namba..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border-2 border-primary/10 hover:border-primary/35 focus:border-secondary focus:outline-none rounded-lg text-xs font-semibold text-primary transition-colors"
-          />
+
+        <div className="text-xs font-bold text-gray-500 font-mono hidden sm:block">
+          Wagonjwa Waliosajiliwa: <span className="text-primary font-black">{patients.length}</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Conditionally Render BroadcastCenter if "broadcast" tab is active */}
+      {activeSectionTab === "broadcast" ? (
+        <BroadcastCenter patients={patients} />
+      ) : (
+        <>
+          {/* Search Header for patients */}
+          <div className="bg-white p-4 rounded-xl border-2 border-primary flex flex-col sm:flex-row items-center gap-4 shadow-sm justify-between">
+            <div className="relative w-full sm:max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary opacity-60" />
+              <input
+                type="text"
+                placeholder="Tafuta mgonjwa aliyepo kwa jina au namba ya simu..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 p-2.5 bg-white border-2 border-primary rounded-lg text-sm font-semibold outline-none"
+              />
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => window.print()}
+                className="w-full sm:w-auto px-4 py-2 bg-primary hover:bg-secondary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                Chapisha Orodha
+              </button>
+            </div>
+          </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         
-        {/* Left 2 Columns: Multi-step registration Form */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl border-2 border-primary shadow-sm space-y-6">
-          <form onSubmit={handleFormSubmit} className="space-y-6">
+        {/* Left 2 Columns: Comprehensive HIS Patient Registration Form */}
+        <div className="xl:col-span-2 bg-white p-5 rounded-xl border-2 border-primary shadow-sm space-y-5">
+          <h3 className="text-sm font-bold text-primary font-display uppercase tracking-wider bg-primary text-white p-3.5 rounded flex items-center gap-2.5">
+            <UserPlus className="w-5 h-5 text-secondary" />
+            USAJILI WA HOSPITALI - COMPREHENSIVE PATIENT REGISTRATION FORM
+          </h3>
+
+          <form onSubmit={handleFormSubmit} className="space-y-5">
             
-            {/* Section A: Taarifa za Kibinafsi (Personal Information) */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-secondary font-display uppercase tracking-wider pb-1 border-b border-secondary/15 flex items-center gap-1.5">
-                <User className="w-4 h-4 text-primary" />
-                A. Taarifa Binafsi za Mgonjwa (Personal Details)
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-primary">Jina Kamili la Mgonjwa (Full Name)*</label>
+            {/* Duplication check banner */}
+            {duplicateAlert && (
+              <div className="bg-amber-50 border-l-4 border-secondary p-3 rounded text-xs text-secondary font-bold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                <span>Kumbuka: Kuna mgonjwa tayari mwenye jina hili katika mfumo!</span>
+              </div>
+            )}
+
+            {/* Segment A: Taarifa za Msingi */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-secondary uppercase tracking-widest border-b border-primary/20 pb-1">
+                A. Taarifa za Msingi (Primary Information)
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-primary mb-1">Jina Kamili *</label>
                   <input
                     type="text"
                     required
-                    placeholder="Mtumishi / Jina Kamili"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-primary/20 hover:border-primary/40 focus:border-secondary focus:outline-none rounded text-xs font-semibold text-primary uppercase"
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold animate-none"
+                    placeholder="Mf. Juma Shaban"
                   />
-                  {duplicateAlert && (
-                    <span className="text-[10px] text-red-600 font-bold block">🚨 Onyo: Jina hili limekwisha sajiliwa kwenye mfumo tayari!</span>
-                  )}
                 </div>
-
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-primary mb-1">Namba ya Simu *</label>
+                  <input
+                    type="text"
+                    required
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold"
+                    placeholder="Mf. 07XXXXXXXX"
+                  />
+                </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-primary">Umri (Age)*</label>
+                  <div className="flex flex-col">
+                    <label className="text-xs font-bold text-primary mb-1">Umri *</label>
                     <input
                       type="number"
                       required
-                      min="1"
-                      max="120"
-                      placeholder="Miaka"
                       value={age}
                       onChange={(e) => setAge(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary"
+                      className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold"
+                      placeholder="Miaka"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-primary">Jinsia (Gender)*</label>
+                  <div className="flex flex-col">
+                    <label className="text-xs font-bold text-primary mb-1">Jinsia *</label>
                     <select
                       value={gender}
                       onChange={(e) => setGender(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary"
+                      className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold bg-white"
                     >
-                      <option value="Mwanaume">Mwanaume</option>
-                      <option value="Mwanamke">Mwanamke</option>
+                      <option>Mwanaume</option>
+                      <option>Mwanamke</option>
                     </select>
                   </div>
                 </div>
+              </div>
 
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-primary">Namba ya Simu (Phone)*</label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="07XXXXXXXX au 06XXXXXXXX"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-primary">Barua Pepe (Email Address)</label>
-                  <input
-                    type="email"
-                    placeholder="mteja@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1 md:col-span-2">
-                  <label className="block text-xs font-bold text-primary">Anwani ya Makazi (Physical Address)*</label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-primary mb-1">Mahali Anapoishi (Anwani) *</label>
                   <input
                     type="text"
                     required
-                    placeholder="Mtaa, Kata, Mkoa (Mf: Kariakoo, Dar es Salaam)"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary"
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold"
+                    placeholder="Mf. Gungu, Kigoma"
                   />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-primary mb-1">Barua Pepe (Email)</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold"
+                    placeholder="mfano@alfurqan.com"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col">
+                    <label className="text-xs font-bold text-primary mb-1">Utaifa (Nationality)</label>
+                    <input
+                      type="text"
+                      value={nationality}
+                      onChange={(e) => setNationality(e.target.value)}
+                      className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold"
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-xs font-bold text-primary mb-1">Dini (Religion)</label>
+                    <select
+                      value={religion}
+                      onChange={(e) => setReligion(e.target.value)}
+                      className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold bg-white"
+                    >
+                      <option>Islam</option>
+                      <option>Christian</option>
+                      <option>Mengineyo</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Section B: Vigezo vya Kitaalamu & Kiafya (Health Metrics & Vital Signs) */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-secondary font-display uppercase tracking-wider pb-1 border-b border-secondary/15 flex items-center gap-1.5">
-                <Heart className="w-4 h-4 text-primary" />
-                B. Vipimo vya Msingi vya Kiafya (Vitals & Health Metrics)
-              </h3>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-primary">Kundi la Damu (Blood)*</label>
-                  <select
-                    value={bloodGroup}
-                    onChange={(e) => setBloodGroup(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary font-mono"
-                  >
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="AB+">AB+</option>
-                    <option value="AB-">AB-</option>
-                    <option value="O+">O+</option>
-                    <option value="O-">O-</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-primary">Uzito (Weight - KG)</label>
+            {/* Segment B: Taarifa za Afya & VIPIMO vya Msingi */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-secondary uppercase tracking-widest border-b border-primary/20 pb-1">
+                B. Vipimo vya Msingi (Vitals & Clinical Data)
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-primary mb-1">Weight (Kilo) *</label>
                   <input
                     type="number"
                     step="0.1"
-                    placeholder="KG"
+                    required
                     value={weight}
                     onChange={(e) => setWeight(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary font-mono"
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold"
+                    placeholder="65"
                   />
                 </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-primary">Urefu (Height - Meters)</label>
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-primary mb-1">Height (Mita) *</label>
                   <input
                     type="number"
                     step="0.01"
-                    placeholder="Meters (Mf: 1.72)"
+                    required
                     value={height}
                     onChange={(e) => setHeight(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary font-mono"
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold"
+                    placeholder="1.70"
                   />
                 </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-primary">Kiwango cha BMI (Auto)</label>
-                  <div className="p-2.5 bg-slate-100 border border-primary/10 rounded text-xs font-black text-secondary font-mono">
-                    {bmi > 0 ? `${bmi} (${bmi < 18.5 ? "Underweight" : bmi < 25 ? "Normal" : bmi < 30 ? "Overweight" : "Obese"})` : "Urefu & Uzito kwanza"}
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-primary mb-1">BMI (Computed)</label>
+                  <div className="p-2.5 bg-gray-50 border-2 border-primary/30 rounded-lg text-xs font-bold text-primary font-mono text-center">
+                    {bmi > 0 ? bmi : "0.0"} ({bmi > 0 && bmi < 18.5 ? "Underweight" : bmi >= 18.5 && bmi < 25 ? "Normal" : bmi >= 25 && bmi < 30 ? "Overweight" : bmi >= 30 ? "Obese" : "N/A"})
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Section C: Taarifa za Kijamii & Kazi (Social & Occupational Background) */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-secondary font-display uppercase tracking-wider pb-1 border-b border-secondary/15 flex items-center gap-1.5">
-                <Briefcase className="w-4 h-4 text-primary" />
-                C. Taarifa za Kijamii na Kazi (Demographics)
-              </h3>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-primary">Kazi (Occupation)</label>
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-primary mb-1">Kundi la Damu</label>
+                  <select
+                    value={bloodGroup}
+                    onChange={(e) => setBloodGroup(e.target.value)}
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold bg-white"
+                  >
+                    <option>O+</option>
+                    <option>O-</option>
+                    <option>A+</option>
+                    <option>A-</option>
+                    <option>B+</option>
+                    <option>B-</option>
+                    <option>AB+</option>
+                    <option>AB-</option>
+                  </select>
+                </div>
+                <div className="flex flex-col col-span-2 md:col-span-1">
+                  <label className="text-xs font-bold text-primary mb-1">Kazi (Occupation)</label>
                   <input
                     type="text"
-                    placeholder="Mf: Mfanyabiashara"
                     value={occupation}
                     onChange={(e) => setOccupation(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary"
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold"
+                    placeholder="Mf. Mkulima"
                   />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-primary">Dini (Religion)</label>
-                  <select
-                    value={religion}
-                    onChange={(e) => setReligion(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary"
-                  >
-                    <option value="Islam">Islam</option>
-                    <option value="Christian">Christian</option>
-                    <option value="Hindu">Hindu</option>
-                    <option value="Nyingine">Nyingine</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-primary">Uraia (Nationality)</label>
-                  <input
-                    type="text"
-                    value={nationality}
-                    onChange={(e) => setNationality(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-primary">Hali ya Ndoa</label>
-                  <select
-                    value={maritalStatus}
-                    onChange={(e) => setMaritalStatus(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary"
-                  >
-                    <option value="Hajaoa">Hajaoa / Hajaolewa</option>
-                    <option value="Ameoa">Ameoa / Ameolewa</option>
-                    <option value="Mjane">Mjane</option>
-                    <option value="Mtalaka">Mtalaka</option>
-                  </select>
                 </div>
               </div>
             </div>
 
-            {/* Section D: Dharura & Picha za Usalama (Emergency & Security Photo) */}
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-secondary font-display uppercase tracking-wider pb-1 border-b border-secondary/15 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-primary" />
-                D. Dharura & Alama za Usalama (Emergency Contact & Biometrics)
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-slate-50 border border-primary/10 rounded-xl space-y-3">
-                  <p className="text-[10px] text-primary font-extrabold uppercase tracking-wide">Mwasiliani wa Dharura (Next of Kin)</p>
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-primary">Jina la Mwasiliani*</label>
-                      <input
-                        type="text"
-                        placeholder="Jina"
-                        value={emergencyName}
-                        onChange={(e) => setEmergencyName(e.target.value)}
-                        className="w-full p-2 bg-white border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="block text-[10px] font-bold text-primary">Uhusiano*</label>
+            {/* Segment C: Mfumo wa Malipo & Bima */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-secondary uppercase tracking-widest border-b border-primary/20 pb-1">
+                C. Malipo & Bima (Billing & Insurance Details)
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-primary mb-1">Njia ya Malipo</label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold bg-white"
+                  >
+                    <option>Cash</option>
+                    <option>Mobile Money</option>
+                    <option>Bank Transfer</option>
+                    <option>Insurance</option>
+                  </select>
+                </div>
+                <div className="flex flex-col justify-end pb-1.5">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-primary">
+                    <input
+                      type="checkbox"
+                      checked={hasInsurance}
+                      onChange={(e) => setHasInsurance(e.target.checked)}
+                      className="w-4 h-4 rounded border-primary text-secondary focus:ring-secondary"
+                    />
+                    <span>Mgonjwa anatumia Bima?</span>
+                  </label>
+                </div>
+                {hasInsurance && (
+                  <>
+                    <div className="flex flex-col">
+                      <label className="text-xs font-bold text-primary mb-1">Mtoa Bima (Provider)</label>
                       <select
-                        value={emergencyRelation}
-                        onChange={(e) => setEmergencyRelation(e.target.value)}
-                        className="w-full p-2 bg-white border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary"
+                        value={insuranceProvider}
+                        onChange={(e) => setInsuranceProvider(e.target.value)}
+                        className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold bg-white"
                       >
-                        <option value="Mke">Mke</option>
-                        <option value="Mume">Mume</option>
-                        <option value="Mzazi">Mzazi</option>
-                        <option value="Mtoto">Mtoto</option>
-                        <option value="Ndugu">Ndugu</option>
-                        <option value="Rafiki">Rafiki</option>
+                        <option value="NHIF">NHIF (Mifuko ya Kitaifa)</option>
+                        <option value="AAR">AAR Insurance</option>
+                        <option value="Jubilee">Jubilee Insurance</option>
+                        <option value="Strategies">Strategies Insurance</option>
                       </select>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <label className="block text-[10px] font-bold text-primary">Namba ya Simu ya Dharura*</label>
-                    <input
-                      type="tel"
-                      placeholder="Namba ya Simu"
-                      value={emergencyPhone}
-                      onChange={(e) => setEmergencyPhone(e.target.value)}
-                      className="w-full p-2 bg-white border border-primary/20 focus:outline-none rounded text-xs font-semibold text-primary font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="p-4 bg-slate-50 border border-primary/10 rounded-xl space-y-3 flex flex-col justify-between">
-                  <p className="text-[10px] text-primary font-extrabold uppercase tracking-wide">Picha & Usajili Kidole (Photo & Biometrics)</p>
-                  
-                  {/* Photo upload / Camera capture options */}
-                  <div className="flex flex-col sm:flex-row items-center gap-4">
-                    <div className="relative">
-                      <img
-                        src={photoUrl}
-                        alt="Picha ya Mgonjwa"
-                        className="w-24 h-24 rounded-lg object-cover border-2 border-primary shadow-sm"
-                        referrerPolicy="no-referrer"
+                    <div className="flex flex-col">
+                      <label className="text-xs font-bold text-primary mb-1">Namba ya Kadi ya Bima</label>
+                      <input
+                        type="text"
+                        value={insurancePolicy}
+                        onChange={(e) => setInsurancePolicy(e.target.value)}
+                        className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold"
+                        placeholder="Namba ya Kadi"
                       />
-                      {aiProcessing && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
-                          <div className="w-6 h-6 border-2 border-t-transparent border-white rounded-full animate-spin"></div>
-                        </div>
-                      )}
                     </div>
-                    <div className="flex-1 space-y-2 w-full">
-                      <label className="block text-xs font-bold text-primary">Chagua Picha au Piga Picha (Upload or Camera)</label>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => document.getElementById("photo-file-upload")?.click()}
-                          className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-primary border border-primary/20 font-bold text-xs rounded flex items-center gap-1.5 transition-colors cursor-pointer"
-                        >
-                          <Upload className="w-3.5 h-3.5" />
-                          Picha ya Mgonjwa
-                        </button>
-                        <input
-                          type="file"
-                          id="photo-file-upload"
-                          accept="image/*"
-                          onChange={handlePhotoUpload}
-                          className="hidden"
-                        />
-                        <button
-                          type="button"
-                          onClick={toggleCamera}
-                          className="px-3.5 py-2 bg-primary hover:bg-secondary text-white font-bold text-xs rounded flex items-center gap-1.5 transition-colors cursor-pointer"
-                        >
-                          <Camera className="w-3.5 h-3.5" />
-                          Piga Picha
-                        </button>
-                        <button
-                          type="button"
-                          onClick={triggerAiProcessing}
-                          disabled={aiProcessing}
-                          className="px-3.5 py-2 bg-secondary text-white font-bold text-xs rounded flex items-center gap-1.5 transition-all cursor-pointer"
-                        >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          Ondoa Background ya AI
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleFingerprintRegistration}
-                          className={`px-3.5 py-2 font-bold text-xs rounded flex items-center gap-1.5 transition-all cursor-pointer ${
-                            fingerprintEnabled ? "bg-emerald-600 text-white animate-pulse" : "bg-gray-200 text-primary border border-primary/20 hover:bg-gray-300"
-                          }`}
-                        >
-                          <Fingerprint className="w-3.5 h-3.5" />
-                          {fingerprintEnabled ? "Kidole kimesajiliwa ✅" : "Sajili Kidole cha Simu"}
-                        </button>
-                      </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Segment D: Dharura, Uhusiano, Picha na Biometria */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-secondary uppercase tracking-widest border-b border-primary/20 pb-1">
+                D. Dharura & Picha za Usalama (Emergency & Security Photo)
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-primary mb-1">Mtu wa Karibu / Dharura *</label>
+                  <input
+                    type="text"
+                    required
+                    value={emergencyName}
+                    onChange={(e) => setEmergencyName(e.target.value)}
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold"
+                    placeholder="Mf. Salma Hassan"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-primary mb-1">Simu ya Mtu wa Karibu *</label>
+                  <input
+                    type="text"
+                    required
+                    value={emergencyPhone}
+                    onChange={(e) => setEmergencyPhone(e.target.value)}
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold"
+                    placeholder="Mf. 07XXXXXXXX"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-primary mb-1">Uhusiano (Relation)</label>
+                  <select
+                    value={emergencyRelation}
+                    onChange={(e) => setEmergencyRelation(e.target.value)}
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold bg-white"
+                  >
+                    <option>Mke</option>
+                    <option>Mume</option>
+                    <option>Baba</option>
+                    <option>Mama</option>
+                    <option>Mtoto</option>
+                    <option>Ndugu mwingine</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Photo upload / Camera capture options */}
+              <div className="bg-gray-50 p-4 rounded-lg border-2 border-dashed border-primary/30 space-y-3">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <PatientAvatar
+                      src={photoUrl}
+                      name={name || "Preview"}
+                      className="w-14 h-14 rounded-full border-2 border-secondary object-cover"
+                      fallbackSizeClass="w-14 h-14 text-sm"
+                    />
+                    <div>
+                      <p className="text-xs font-bold text-primary">Picha ya Kitambulisho cha Hospitali</p>
+                      <p className="text-[10px] text-gray-500">Mgonjwa anapaswa kuwa na picha yenye background nyekundu.</p>
                     </div>
-                    {aiStatus && (
-                      <p className="text-[11px] text-emerald-700 font-bold font-mono text-center">
-                        {aiProcessing ? "⚡ " : "✅ "}{aiStatus}
-                      </p>
-                    )}
+                  </div>
+                  <div className="flex gap-2 flex-wrap w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById("photo-file-upload")?.click()}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Weka Picha (PNG/JPG)
+                    </button>
+                    <input
+                      type="file"
+                      id="photo-file-upload"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={toggleCamera}
+                      className="px-3.5 py-2 bg-primary hover:bg-secondary text-white font-bold text-xs rounded flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      Piga Picha
+                    </button>
+                    <button
+                      type="button"
+                      onClick={triggerAiProcessing}
+                      disabled={aiProcessing}
+                      className="px-3.5 py-2 bg-secondary text-white font-bold text-xs rounded flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Ondoa Background ya AI
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleFingerprintRegistration}
+                      className={`px-3.5 py-2 font-bold text-xs rounded flex items-center gap-1.5 transition-all cursor-pointer ${
+                        fingerprintEnabled ? "bg-emerald-600 text-white animate-pulse" : "bg-gray-200 text-primary border border-primary/20 hover:bg-gray-300"
+                      }`}
+                    >
+                      <Fingerprint className="w-3.5 h-3.5" />
+                      {fingerprintEnabled ? "Kidole kimesajiliwa ✅" : "Sajili Kidole cha Simu"}
+                    </button>
                   </div>
                 </div>
+                {aiStatus && (
+                  <p className="text-[11px] text-emerald-700 font-bold font-mono text-center">
+                    {aiProcessing ? "⚡ " : "✅ "}{aiStatus}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -989,7 +1059,7 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                       className="p-3 bg-secondary hover:bg-primary text-white font-bold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow hover:shadow-lg"
                     >
                       <Download className="w-4 h-4" />
-                      Pakua Kadi (Saves PNG to Device)
+                      Pakua Kadi (Saves PNG to Gallery/Device)
                     </button>
                     <button
                       onClick={() => window.print()}
@@ -1011,7 +1081,6 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
                 </div>
               );
             })()}
-            {/* OLD_CARD_END */}
           </div>
 
           {/* Quick lookup list of recently registered patients */}
@@ -1069,6 +1138,8 @@ export default function PatientsView({ patients, onAddPatient, onDeletePatient }
         </div>
 
       </div>
+    </>
+    )}
 
     </div>
   );
