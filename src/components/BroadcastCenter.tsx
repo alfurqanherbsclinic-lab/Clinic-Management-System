@@ -1,40 +1,53 @@
 import React, { useState, useEffect } from "react";
-import {
-  Send,
-  MessageSquare,
-  Users,
-  User,
+import { 
+  Send, 
+  Users, 
+  User, 
+  MessageSquare, 
+  PhoneCall, 
+  Clock, 
+  CheckCircle2, 
+  XCircle, 
+  Sparkles, 
+  ShieldCheck, 
+  KeyRound, 
+  Settings2, 
+  Info, 
   Smartphone,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  Sparkles,
-  Key,
-  Settings,
-  HelpCircle,
-  RefreshCw,
   ExternalLink,
-  ShieldCheck,
-  Info
+  Search,
+  Check,
+  History
 } from "lucide-react";
-import { Patient } from "../types";
+
+interface Patient {
+  id: string;
+  fullName: string;
+  cardNumber: string;
+  phone: string;
+  gender: string;
+}
 
 interface BroadcastCenterProps {
   patients: Patient[];
 }
 
-export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
-  // Target recipient mode: "bulk" (all patients), "single" (individual patient), or "manual" (custom daily phone numbers)
-  const [recipientMode, setRecipientMode] = useState<"bulk" | "single" | "manual">("bulk");
-  const [selectedPatientId, setSelectedPatientId] = useState<string>(
-    patients.length > 0 ? patients[0].id : ""
+export const BroadcastCenter: React.FC<BroadcastCenterProps> = ({ patients }) => {
+  // Recipient selection mode: 'all' | 'single' | 'manual'
+  const [recipientMode, setRecipientMode] = useState<"all" | "single" | "manual">("all");
+  const [selectedPatientId, setSelectedPatientId] = useState<string>("");
+  const [manualPhoneInput, setManualPhoneInput] = useState<string>("");
+  const [patientSearchTerm, setPatientSearchTerm] = useState<string>("");
+
+  // Gateway channel: 'oasis' | 'whatsapp'
+  const [gatewayChannel, setGatewayChannel] = useState<"oasis" | "whatsapp">("oasis");
+
+  // Custom Message Body
+  const [messageBody, setMessageBody] = useState<string>(
+    "Habari ndugu mgonjwa wetu wa Al-Furqan Herbs Clinic, kumbuka kunywa maji ya kutosha na kufuata ushauri wa daktari. Mungu akujalie shifaa na afya njema."
   );
-  const [manualPhoneNumbers, setManualPhoneNumbers] = useState<string>("");
 
-  // Sending Channel: "oasis" (Bulk SMS Oasis Tech) or "whatsapp" (Free Direct wa.me)
-  const [sendChannel, setSendChannel] = useState<"oasis" | "whatsapp">("oasis");
-
-  // API Credentials State for Oasis Tech
+  // Oasis Credentials & Proxy Configuration
   const [oasisApiKey, setOasisApiKey] = useState<string>(() => {
     return localStorage.getItem("oasis_api_key") || "";
   });
@@ -42,7 +55,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
     return localStorage.getItem("oasis_sender_id") || "ALFURQAN";
   });
   const [oasisBaseUrl, setOasisBaseUrl] = useState<string>(() => {
-    return localStorage.getItem("oasis_base_url") || "https://bulksms.oasistech.co.tz/api/v1/send";
+    return localStorage.getItem("oasis_base_url") || "https://api.oasistech.co.tz/v1/sms/send";
   });
   const [useCorsProxy, setUseCorsProxy] = useState<boolean>(() => {
     return localStorage.getItem("oasis_use_cors_proxy") !== "false";
@@ -50,17 +63,19 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
   const [showApiSettings, setShowApiSettings] = useState<boolean>(false);
 
   // Message Category / Template Preset
-  const [category, setCategory] = useState<string>("Ushauri wa Afya (General Health Advice)");
-  const [messageBody, setMessageBody] = useState<string>(
-    "Habari ndugu mgonjwa wetu wa Al-Furqan Herbs Clinic, kumbuka kunywa maji ya kutosha na kufuata ushauri wa daktari..."
-  );
+  const [selectedCategory, setSelectedCategory] = useState<string>("general");
 
-  // Status & Progress
+  // Sending status / Logs
   const [isSending, setIsSending] = useState<boolean>(false);
-  const [sendProgress, setSendProgress] = useState<number>(0);
-  const [logs, setLogs] = useState<
-    Array<{ id: string; time: string; recipient: string; channel: string; status: "success" | "failed"; details: string }>
-  >([]);
+  const [sendLogs, setSendLogs] = useState<{
+    id: string;
+    timestamp: string;
+    recipientName: string;
+    phone: string;
+    channel: string;
+    status: "success" | "failed" | "pending";
+    details: string;
+  }[]>([]);
 
   // Auto save Oasis credentials to localStorage
   useEffect(() => {
@@ -77,9 +92,9 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
     }
   }, [patients, selectedPatientId]);
 
-  // Helper to standardise Tanzania phone numbers to 2557XXXXXXXX format
-  const formatTanzaniaPhone = (phoneStr: string): string => {
-    let cleaned = phoneStr.replace(/\D/g, "");
+  // Clean and format phone number for Tanzania (+255 or 0...)
+  const formatTanzaniaPhone = (rawPhone: string): string => {
+    let cleaned = rawPhone.replace(/\D/g, "");
     if (cleaned.startsWith("0")) {
       cleaned = "255" + cleaned.substring(1);
     } else if (cleaned.startsWith("7") || cleaned.startsWith("6")) {
@@ -88,224 +103,327 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
     return cleaned;
   };
 
+  // Helper to extract clean human-readable error messages from API responses without [object Object]
+  const extractErrorMessage = (data: any, fallback: string): string => {
+    if (!data) return fallback;
+    if (typeof data === "string") {
+      if (data.trim().startsWith("<!DOCTYPE") || data.trim().startsWith("<html")) {
+        return "Server / Proxy hairudishi JSON (404/500 Route Error)";
+      }
+      return data;
+    }
+    if (data.message) {
+      if (typeof data.message === "string" && data.message.trim()) return data.message;
+      if (typeof data.message === "object") {
+        try {
+          const val = Object.values(data.message).flat().join(", ");
+          if (val) return val;
+        } catch {}
+      }
+    }
+    if (data.error) {
+      if (typeof data.error === "string" && data.error.trim()) return data.error;
+      if (typeof data.error === "object") {
+        if (typeof data.error.message === "string" && data.error.message.trim()) return data.error.message;
+        if (typeof data.error.description === "string" && data.error.description.trim()) return data.error.description;
+        try {
+          return JSON.stringify(data.error);
+        } catch {}
+      }
+    }
+    if (data.errors) {
+      if (typeof data.errors === "string" && data.errors.trim()) return data.errors;
+      if (typeof data.errors === "object") {
+        try {
+          const val = Object.values(data.errors).flat().join(", ");
+          if (val) return val;
+        } catch {}
+      }
+    }
+    if (data.detail && typeof data.detail === "string") return data.detail;
+
+    try {
+      const jsonStr = JSON.stringify(data);
+      return jsonStr !== "{}" ? jsonStr : fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
   // Get active target list based on single/bulk/manual selection
   const getTargetPatients = (): { id: string; name: string; phone: string; cardNumber: string }[] => {
     if (recipientMode === "single") {
-      const p = patients.find((item) => item.id === selectedPatientId);
-      return p ? [p] : [];
+      const found = patients.find(p => p.id === selectedPatientId);
+      if (found) {
+        return [{ id: found.id, name: found.fullName, phone: formatTanzaniaPhone(found.phone), cardNumber: found.cardNumber }];
+      }
+      return [];
     }
+
     if (recipientMode === "manual") {
-      const numbersArray = manualPhoneNumbers
-        .split(/[\n,;\s]+/)
-        .map((n) => n.trim())
-        .filter((n) => n.length >= 8);
-      
-      const uniqueNumbers: string[] = Array.from(new Set(numbersArray));
-      return uniqueNumbers.map((num: string, idx: number) => ({
+      const rawNumbers = manualPhoneInput.split(/[\n,;]+/).map(n => n.trim()).filter(Boolean);
+      return rawNumbers.map((num, idx) => ({
         id: `manual-${idx}`,
         name: `Namba ya Siku #${idx + 1}`,
-        phone: num,
-        cardNumber: `N/A`
+        phone: formatTanzaniaPhone(num),
+        cardNumber: "N/A"
       }));
     }
-    return patients;
+
+    // Default: 'all'
+    return patients.map(p => ({
+      id: p.id,
+      name: p.fullName,
+      phone: formatTanzaniaPhone(p.phone),
+      cardNumber: p.cardNumber
+    }));
   };
 
-  const targetPatients = getTargetPatients();
-  const targetCount = targetPatients.length;
+  const targetList = getTargetPatients();
 
-  // Single patient/recipient WhatsApp Direct trigger
-  const handleOpenSingleWhatsApp = (recipient: { name: string; phone: string; cardNumber: string }) => {
-    if (!messageBody.trim()) {
-      alert("Tafadhali andika ujumbe kwanza kabla ya kutuma!");
-      return;
+  // Handle Quick Template Apply
+  const applyPresetTemplate = (type: string) => {
+    setSelectedCategory(type);
+    if (type === "health_tip") {
+      setMessageBody("Ushauri wa Afya kutoka Al-Furqan Herbs Clinic: Hakikisha unakunywa maji ya kutosha na kula matunda ili kuimarisha kinga ya mwili wako kila siku.");
+    } else if (type === "appointment") {
+      setMessageBody("Habari {JINA}, tunapenda kukukumbusha kuhusu miadi yako ya marejeo ya matibabu katika kliniki yetu ya Al-Furqan Herbs. Karibu tukuhudumie.");
+    } else if (type === "sunnah_remedy") {
+      setMessageBody("Dokezo la Tiba Asilia & Sunnah: Matumizi ya Habbat Sawdaa na Asali mbichi yanasaidia sana kuimarisha afya ya tumbo na kinga ya mwili.");
     }
-    const formattedPhone = formatTanzaniaPhone(recipient.phone);
-    const personalizedText = messageBody.replace(/\{JINA\}/g, recipient.name).replace(/\{CARD_NO\}/g, recipient.cardNumber);
-    const encodedText = encodeURIComponent(personalizedText);
-    const waUrl = `https://wa.me/${formattedPhone}?text=${encodedText}`;
-    window.open(waUrl, "_blank", "noopener,noreferrer");
   };
 
-  // Handle Send Broadcast (SMS via Oasis or WhatsApp Loop)
+  // Handle Send Messages
   const handleSendBroadcast = async () => {
-    if (!messageBody.trim()) {
-      alert("Tafadhali andika ujumbe wako kwanza!");
+    if (targetList.length === 0) {
+      alert("Tafadhali chagua au ingiza angalau namba moja ya mgonjwa.");
       return;
     }
 
-    if (targetPatients.length === 0) {
-      alert("Hakuna namba au mgonjwa aliyechaguliwa kwa ajili ya kutuma ujumbe!");
+    if (!messageBody.trim()) {
+      alert("Tafadhali ingiza ujumbe unaotaka kutuma.");
       return;
     }
 
     setIsSending(true);
-    setSendProgress(0);
 
     const hasApiKey = Boolean(oasisApiKey && oasisApiKey.trim().length > 5);
     const sender = oasisSenderId.trim() || "ALFURQAN";
 
-    for (let i = 0; i < targetPatients.length; i++) {
-      const p = targetPatients[i];
-      const recipientPhone = formatTanzaniaPhone(p.phone);
-      const textToDeliver = messageBody.replace(/\{JINA\}/g, p.name).replace(/\{CARD_NO\}/g, p.cardNumber);
+    for (const recipient of targetList) {
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const textToDeliver = messageBody.replace(/\{JINA\}/g, recipient.name);
+      const recipientPhone = recipient.phone;
 
       let isSuccess = false;
       let responseDetails = "";
 
-      if (hasApiKey) {
+      if (gatewayChannel === "whatsapp") {
+        // WhatsApp Web Link Mode
+        const encodedText = encodeURIComponent(textToDeliver);
+        const waUrl = `https://wa.me/${recipientPhone}?text=${encodedText}`;
+        window.open(waUrl, "_blank");
+        isSuccess = true;
+        responseDetails = "Imefunguliwa kwenye WhatsApp Direct Window";
+      } else if (hasApiKey) {
         try {
-          let response: Response;
+          let response: Response | null = null;
+          const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
+          const payload = {
+            sender_id: sender,
+            recipient: recipientPhone,
+            message: textToDeliver
+          };
 
           if (useCorsProxy) {
-            // Option 1: Send via Server Proxy route (/api/sms/send) - completely bypasses browser CORS!
-            response = await fetch("/api/sms/send", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-              },
-              body: JSON.stringify({
-                apiKey: oasisApiKey.trim(),
-                sender_id: sender,
-                recipient: recipientPhone,
-                message: textToDeliver,
-                baseUrl: oasisBaseUrl.trim()
-              })
-            });
-          } else {
-            // Option 2: Direct browser call to Oasis Endpoint
-            response = await fetch(oasisBaseUrl.trim(), {
+            // Attempt 1: Try local server proxy (/api/sms/send)
+            try {
+              const proxyResp = await fetch("/api/sms/send", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Accept": "application/json"
+                },
+                body: JSON.stringify({
+                  apiKey: oasisApiKey.trim(),
+                  sender_id: sender,
+                  recipient: recipientPhone,
+                  message: textToDeliver,
+                  baseUrl: targetUrl
+                })
+              });
+
+              if (proxyResp.status !== 404 && proxyResp.status !== 405) {
+                response = proxyResp;
+              }
+            } catch (pErr) {
+              // Local proxy endpoint not available
+            }
+
+            // Attempt 2: If local server proxy missing (e.g. static hosting on Vercel), try Public CORS proxy
+            if (!response) {
+              try {
+                const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+                response = await fetch(publicProxyUrl, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${oasisApiKey.trim()}`,
+                    "Accept": "application/json"
+                  },
+                  body: JSON.stringify(payload)
+                });
+              } catch (pubErr) {
+                // Public proxy failed, will try direct fetch
+              }
+            }
+          }
+
+          // Attempt 3: Direct fetch fallback if no proxy response was received
+          if (!response) {
+            response = await fetch(targetUrl, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${oasisApiKey.trim()}`,
                 "Accept": "application/json"
               },
-              body: JSON.stringify({
-                sender_id: sender,
-                recipient: recipientPhone,
-                message: textToDeliver
-              })
+              body: JSON.stringify(payload)
             });
           }
 
           if (response.ok) {
             const data = await response.json().catch(() => ({}));
             isSuccess = true;
-            responseDetails = data.message || `Ujumbe umewasilishwa kwa mafanikio (${recipientPhone})`;
+            const msg = extractErrorMessage(data, `Ujumbe umewasilishwa kwa mafanikio (${recipientPhone})`);
+            responseDetails = msg;
           } else {
-            const errJson = await response.json().catch(() => ({}));
-            const msg = errJson.message || errJson.error || `HTTP ${response.status} kutoka Oasis Gateway`;
+            let errData: any = {};
+            const contentType = response.headers.get("content-type") || "";
+            if (contentType.includes("application/json")) {
+              errData = await response.json().catch(() => ({}));
+            } else {
+              const txt = await response.text().catch(() => "");
+              errData = txt;
+            }
+
+            const cleanMsg = extractErrorMessage(errData, `HTTP ${response.status} kutoka Oasis Gateway`);
             isSuccess = false;
-            responseDetails = `Hitilafu ya Oasis: ${msg}`;
+            responseDetails = `Hitilafu ya Oasis: ${cleanMsg}`;
           }
         } catch (err: unknown) {
           const errMsg = err instanceof Error ? err.message : String(err);
           const isCorsError = errMsg.toLowerCase().includes("failed to fetch") || errMsg.toLowerCase().includes("networkerror");
           
-          if (isCorsError && !useCorsProxy) {
+          if (isCorsError) {
             isSuccess = false;
-            responseDetails = `Kizuizi cha Kivinjari (CORS Error): Oasis server inakataa ombi kutoka kivinjarini. Tafadhali wezesha "Server Proxy (CORS Bypass)" kwenye mipangilio.`;
+            responseDetails = `Kizuizi cha Kivinjari (CORS Error): Server ya Oasis inakataa maombi ya moja kwa moja. Mfumo unatumia Server Proxy kurekebisha hili.`;
           } else {
-            isSuccess = true;
-            responseDetails = `Imeandikishwa kwa ajili ya kutumwa (${recipientPhone}) [Proxy Ack]`;
+            isSuccess = false;
+            responseDetails = `Hitilafu ya Mtandao: ${errMsg}`;
           }
         }
       } else {
         // Mode without API key configured yet (Simulation Mode)
-        await new Promise((r) => setTimeout(r, 200));
         isSuccess = true;
         responseDetails = `Njia ya Majaribio (Weka API Key na chagua Server Proxy kutuma SMS za kweli)`;
       }
 
       const logItem = {
-        id: Math.random().toString(36).substring(2, 9),
-        time: new Date().toLocaleTimeString("sw-TZ", { hour: "2-digit", minute: "2-digit" }),
-        recipient: `${p.name} (${recipientPhone})`,
-        channel: sendChannel === "oasis" ? `Oasis SMS (${sender})` : "WhatsApp Direct",
+        id: Math.random().toString(36).substr(2, 9),
+        timestamp: timeStr,
+        recipientName: recipient.name,
+        phone: recipientPhone,
+        channel: gatewayChannel === "oasis" ? "Oasis Bulk API" : "WhatsApp Direct",
         status: isSuccess ? ("success" as const) : ("failed" as const),
         details: responseDetails
       };
 
-      setLogs((prev) => [logItem, ...prev]);
-      setSendProgress(Math.round(((i + 1) / targetPatients.length) * 100));
+      setSendLogs(prev => [logItem, ...prev]);
     }
 
     setIsSending(false);
   };
 
-  // Quick preset loader
-  const handleSelectPreset = (title: string, text: string) => {
-    setCategory(title);
-    setMessageBody(text);
-  };
+  // Filter patients in selector dropdown
+  const filteredPatients = patients.filter(
+    p =>
+      p.fullName.toLowerCase().includes(patientSearchTerm.toLowerCase()) ||
+      p.cardNumber.toLowerCase().includes(patientSearchTerm.toLowerCase()) ||
+      p.phone.includes(patientSearchTerm)
+  );
 
   return (
-    <div className="space-y-6 pb-12 animate-fadeIn">
-      {/* Top Banner Header */}
-      <div className="bg-gradient-to-r from-primary via-primary/95 to-emerald-800 text-white p-6 rounded-2xl shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 opacity-10 flex items-center pr-6 pointer-events-none">
-          <MessageSquare className="w-64 h-64 text-white" />
-        </div>
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* Top Banner & Header */}
+      <div className="bg-gradient-to-r from-emerald-900 via-primary to-teal-900 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden border border-emerald-700/50">
+        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-400/20 via-transparent to-transparent pointer-events-none" />
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="bg-secondary/20 text-secondary text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full border border-secondary/30 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-secondary" />
-                MASS COMMUNICATION & GATEWAY
+            <div className="flex items-center gap-2 mb-2">
+              <span className="px-3 py-1 bg-amber-400/20 text-amber-300 rounded-full text-xs font-bold uppercase tracking-wider border border-amber-400/30 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                Mass Communication & Gateway
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-2">
+            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
               Kituo cha Kutuma Ujumbe (Bulk Broadcast Center)
             </h1>
-            <p className="text-emerald-100 text-xs sm:text-sm font-medium mt-1 max-w-2xl">
+            <p className="text-emerald-100 text-sm mt-1 max-w-2xl">
               Tuma ujumbe wa dharura, dokezo la afya, au taarifa za kliniki kwa wagonjwa wote waliosajiliwa au kwa kuingiza namba maalum za siku.
             </p>
           </div>
 
-          <button
-            onClick={() => setShowApiSettings(!showApiSettings)}
-            className="self-start md:self-center px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold transition-all flex items-center gap-2 backdrop-blur-md cursor-pointer"
-          >
-            <Settings className="w-4 h-4 text-secondary" />
-            <span>Mipangilio ya Gateway (Oasis API)</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowApiSettings(!showApiSettings)}
+              className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl text-xs backdrop-blur-md border border-white/20 transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+            >
+              <Settings2 className="w-4 h-4 text-amber-300" />
+              <span>Mipangilio ya Gateway (Oasis API)</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Collapsible API Settings Drawer */}
+      {/* API Key Credentials Modal / Expandable Panel */}
       {showApiSettings && (
-        <div className="bg-amber-50/90 border-2 border-amber-200 p-5 rounded-2xl shadow-lg space-y-4 animate-fadeIn">
-          <div className="flex items-center justify-between border-b border-amber-200/80 pb-3">
+        <div className="bg-amber-50/90 border-2 border-amber-300/80 rounded-2xl p-5 space-y-4 text-gray-800 animate-in fade-in slide-in-from-top-4 duration-300 shadow-lg">
+          <div className="flex items-center justify-between border-b border-amber-200 pb-3">
             <div className="flex items-center gap-2">
-              <Key className="w-5 h-5 text-amber-700" />
-              <h3 className="font-extrabold text-sm text-primary uppercase tracking-wide">
-                MIPANGILIO YA SANIKISHO LA OASIS TECHNOLOGIES API
-              </h3>
+              <div className="p-2 bg-amber-500 text-white rounded-lg">
+                <KeyRound className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-gray-900">
+                  Mipangilio ya API ya Oasis Technologies (bulksms.oasistech.co.tz)
+                </h3>
+                <p className="text-xs text-gray-600">
+                  Ingiza ufunguo wako wa siri (Bearer Token) kutoka dashboard yako ya Oasis ili kutuma SMS za kweli moja kwa moja kwa wagonjwa.
+                </p>
+              </div>
             </div>
             <a
               href="https://bulksms.oasistech.co.tz"
               target="_blank"
               rel="noreferrer"
-              className="text-xs font-bold text-amber-800 hover:underline flex items-center gap-1"
+              className="text-xs font-bold text-amber-800 hover:underline flex items-center gap-1 bg-amber-200/60 px-3 py-1.5 rounded-lg"
             >
-              <span>Fungua Dashboard ya Oasis Tech</span>
-              <ExternalLink className="w-3.5 h-3.5" />
+              Fungua Dashboard ya Oasis <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <label className="text-xs font-bold text-gray-700 block">
-                Oasis API Key / Bearer Token:
+                API Key / Bearer Token:
               </label>
               <input
                 type="password"
                 value={oasisApiKey}
                 onChange={(e) => setOasisApiKey(e.target.value)}
-                placeholder="Weka API Key kutoka bulksms.oasistech.co.tz"
+                placeholder="Ingiza API Key ya Oasis hapa..."
                 className="w-full p-2.5 bg-white border-2 border-amber-300 rounded-lg text-xs font-mono font-semibold text-primary outline-none focus:border-amber-500 shadow-sm"
               />
               <p className="text-[10px] text-gray-500">
@@ -313,9 +431,9 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
               </p>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <label className="text-xs font-bold text-gray-700 block">
-                Jina la Mtumaji (Sender ID):
+                Sender ID (Jina la Mtumaji):
               </label>
               <input
                 type="text"
@@ -393,7 +511,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-xs text-amber-900 bg-amber-100/70 p-3 rounded-lg font-medium">
+          <div className="flex items-center justify-between text-xs pt-1">
             <span className="flex items-center gap-1.5 font-semibold">
               <Info className="w-4 h-4 text-amber-600 flex-shrink-0" />
               Ikiwa huna API Key bado, mfumo utakuruhusu kufanya majaribio ya Simulation bila kukwama.
@@ -408,390 +526,352 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
         </div>
       )}
 
-      {/* Main Grid: Broadcast Composer & Stats Sidebar */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        
-        {/* Left 2 Columns: Form Controls */}
-        <div className="xl:col-span-2 space-y-5">
-          
-          {/* Target Recipient Selector (Single vs Bulk vs Manual) */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-            <label className="text-xs font-extrabold text-primary uppercase tracking-wider block">
-              CHAGUA WALENGWA (RECIPIENT TARGET)
-            </label>
+      {/* Main Broadcast Control Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Form & Controls */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Target Selection Card */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-2">
+              <Users className="w-4 h-4 text-primary" />
+              Chagua Walengwa (Recipient Target)
+            </h2>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Option 1: All Registered Patients */}
               <button
                 type="button"
-                onClick={() => setRecipientMode("bulk")}
-                className={`p-3 rounded-xl border-2 font-bold text-xs flex items-center justify-between transition-all cursor-pointer ${
-                  recipientMode === "bulk"
-                    ? "bg-primary text-white border-primary shadow-md"
-                    : "bg-white text-gray-700 border-gray-200 hover:border-primary/40"
+                onClick={() => setRecipientMode("all")}
+                className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                  recipientMode === "all"
+                    ? "border-primary bg-primary/5 text-primary font-bold shadow-sm"
+                    : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 flex-shrink-0" />
-                  <div className="text-left">
-                    <p className="font-extrabold">Wagonjwa Wote</p>
-                    <p className={`text-[10px] ${recipientMode === "bulk" ? "text-white/80" : "text-gray-400"}`}>
-                      Waliosajiliwa ({patients.length})
-                    </p>
-                  </div>
+                <div className="flex items-center justify-between mb-1">
+                  <Users className="w-5 h-5" />
+                  {recipientMode === "all" && <Check className="w-4 h-4 text-primary" />}
                 </div>
-                {recipientMode === "bulk" && <CheckCircle2 className="w-4 h-4 text-secondary flex-shrink-0" />}
+                <div className="text-xs font-bold">Wagonjwa Wote</div>
+                <div className="text-[10px] text-gray-500 font-normal">
+                  Waliosajiliwa ({patients.length})
+                </div>
               </button>
 
-              {/* Option 2: Single Registered Patient */}
               <button
                 type="button"
                 onClick={() => setRecipientMode("single")}
-                className={`p-3 rounded-xl border-2 font-bold text-xs flex items-center justify-between transition-all cursor-pointer ${
+                className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
                   recipientMode === "single"
-                    ? "bg-primary text-white border-primary shadow-md"
-                    : "bg-white text-gray-700 border-gray-200 hover:border-primary/40"
+                    ? "border-primary bg-primary/5 text-primary font-bold shadow-sm"
+                    : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 flex-shrink-0" />
-                  <div className="text-left">
-                    <p className="font-extrabold">Mgonjwa Mmoja</p>
-                    <p className={`text-[10px] ${recipientMode === "single" ? "text-white/80" : "text-gray-400"}`}>
-                      Chagua Mgonjwa
-                    </p>
-                  </div>
+                <div className="flex items-center justify-between mb-1">
+                  <User className="w-5 h-5" />
+                  {recipientMode === "single" && <Check className="w-4 h-4 text-primary" />}
                 </div>
-                {recipientMode === "single" && <CheckCircle2 className="w-4 h-4 text-secondary flex-shrink-0" />}
+                <div className="text-xs font-bold">Mgonjwa Mmoja</div>
+                <div className="text-[10px] text-gray-500 font-normal">Chagua Mgonjwa</div>
               </button>
 
-              {/* Option 3: Manual Daily Phone Numbers */}
               <button
                 type="button"
                 onClick={() => setRecipientMode("manual")}
-                className={`p-3 rounded-xl border-2 font-bold text-xs flex items-center justify-between transition-all cursor-pointer ${
+                className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
                   recipientMode === "manual"
-                    ? "bg-primary text-white border-primary shadow-md"
-                    : "bg-white text-gray-700 border-gray-200 hover:border-primary/40"
+                    ? "border-primary bg-primary/5 text-primary font-bold shadow-sm"
+                    : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 flex-shrink-0" />
-                  <div className="text-left">
-                    <p className="font-extrabold">Namba za Siku</p>
-                    <p className={`text-[10px] ${recipientMode === "manual" ? "text-white/80" : "text-gray-400"}`}>
-                      Ingiza Namba Ziada
-                    </p>
-                  </div>
+                <div className="flex items-center justify-between mb-1">
+                  <PhoneCall className="w-5 h-5" />
+                  {recipientMode === "manual" && <Check className="w-4 h-4 text-primary" />}
                 </div>
-                {recipientMode === "manual" && <CheckCircle2 className="w-4 h-4 text-secondary flex-shrink-0" />}
+                <div className="text-xs font-bold">Namba za Siku</div>
+                <div className="text-[10px] text-gray-500 font-normal">Ingiza Namba Ziada</div>
               </button>
             </div>
 
-            {/* Select dropdown if Single Patient is picked */}
+            {/* Single Patient Selection UI */}
             {recipientMode === "single" && (
-              <div className="pt-2 animate-fadeIn space-y-1.5">
-                <label className="text-xs font-bold text-gray-600 block">
-                  Chagua Mgonjwa kutoka Orodha ya Mfumo:
+              <div className="space-y-2 bg-gray-50 p-3.5 rounded-xl border border-gray-200 animate-in fade-in duration-200">
+                <label className="text-xs font-bold text-gray-700 block">
+                  Chagua Mgonjwa kutoka kwenye orodha:
                 </label>
+
+                <div className="relative">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={patientSearchTerm}
+                    onChange={(e) => setPatientSearchTerm(e.target.value)}
+                    placeholder="Tafuta kwa jina, kadi au namba ya simu..."
+                    className="w-full pl-9 pr-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs outline-none focus:border-primary"
+                  />
+                </div>
+
                 <select
                   value={selectedPatientId}
                   onChange={(e) => setSelectedPatientId(e.target.value)}
-                  className="w-full p-3 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-800 outline-none focus:border-primary shadow-sm"
+                  className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-xs font-semibold text-gray-800 outline-none focus:border-primary"
                 >
-                  {patients.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} — Simu: {p.phone} (Kadi: {p.cardNumber})
-                    </option>
-                  ))}
+                  {filteredPatients.length === 0 ? (
+                    <option value="">Hakuna mgonjwa aliyepatikana</option>
+                  ) : (
+                    filteredPatients.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.fullName} ({p.cardNumber}) - {p.phone}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
             )}
 
-            {/* Textarea for Manual Daily Phone Numbers Input */}
+            {/* Manual Phone Input UI */}
             {recipientMode === "manual" && (
-              <div className="pt-2 animate-fadeIn space-y-1.5">
+              <div className="space-y-2 bg-gray-50 p-3.5 rounded-xl border border-gray-200 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                    <Smartphone className="w-4 h-4 text-primary" />
-                    <span>Ingiza au Bandika Namba za Simu za Siku (Manual Numbers):</span>
+                  <label className="text-xs font-bold text-gray-700 block">
+                    Ingiza au Bandika Namba za Simu za Siku (Manual Numbers):
                   </label>
-                  <span className="text-[11px] font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20">
-                    {targetCount} Namba {targetCount === 1 ? "Iliyotambuliwa" : "Zilizotambuliwa"}
+                  <span className="text-[10px] bg-primary/10 text-primary font-mono px-2 py-0.5 rounded font-bold">
+                    {targetList.length} Namba Iliyotambuliwa
                   </span>
                 </div>
                 <textarea
+                  value={manualPhoneInput}
+                  onChange={(e) => setManualPhoneInput(e.target.value)}
                   rows={3}
-                  value={manualPhoneNumbers}
-                  onChange={(e) => setManualPhoneNumbers(e.target.value)}
-                  placeholder="Andika au bandika namba ukitenganisha kwa koma au mstari mpya (Mfano: 0712345678, 0789123456, 0655112233)"
-                  className="w-full p-3 bg-white border-2 border-primary/30 rounded-xl text-xs font-mono font-bold text-primary outline-none focus:border-primary shadow-sm leading-relaxed"
+                  placeholder="Mfano: 0712345678, 0755123456, 255788990011 (tenganisha kwa koma au mstari mpya)"
+                  className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-xs font-mono text-gray-800 outline-none focus:border-primary"
                 />
-                <p className="text-[10px] text-gray-500 font-medium">
-                  * Unganisha namba kwa koma (<code>,</code>) au mstari mpya. Mfumo utazitambua kiatomati bila kujali formatting.
+                <p className="text-[10px] text-gray-500">
+                  * Unganisha namba kwa koma (,) au mstari mpya. Mfumo utazitambua kiatomati bila kujali formatting.
                 </p>
               </div>
             )}
           </div>
 
-          {/* Channel Selection (Oasis SMS vs WhatsApp Free) */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-            <label className="text-xs font-extrabold text-primary uppercase tracking-wider block">
-              NJIA YA UTUMAJI (SENDING GATEWAY CHANNEL)
-            </label>
+          {/* Gateway Channel Card */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-2">
+              <Smartphone className="w-4 h-4 text-primary" />
+              Njia ya Utumaji (Sending Gateway Channel)
+            </h2>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => setSendChannel("oasis")}
-                className={`p-3 rounded-xl border-2 font-bold text-xs flex items-center justify-between transition-all cursor-pointer ${
-                  sendChannel === "oasis"
-                    ? "bg-emerald-800 text-white border-emerald-800 shadow-md"
-                    : "bg-white text-gray-700 border-gray-200 hover:border-emerald-700/40"
+                onClick={() => setGatewayChannel("oasis")}
+                className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                  gatewayChannel === "oasis"
+                    ? "border-emerald-600 bg-emerald-50 text-emerald-900 font-bold shadow-sm"
+                    : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
                 }`}
               >
-                <div className="flex items-center gap-2.5">
-                  <MessageSquare className="w-4 h-4 text-secondary" />
-                  <div className="text-left">
-                    <p className="font-extrabold">Oasis Technologies SMS Gateway</p>
-                    <p className={`text-[10px] ${sendChannel === "oasis" ? "text-emerald-100" : "text-gray-400"}`}>
-                      SMS Direct kwenda kwa simu ya Mgonjwa
-                    </p>
-                  </div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-extrabold text-xs">Oasis Technologies SMS Gateway</span>
+                  {gatewayChannel === "oasis" && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
                 </div>
-                {sendChannel === "oasis" && <CheckCircle2 className="w-4 h-4 text-secondary" />}
+                <p className="text-[10px] text-gray-500 font-normal">
+                  SMS Direct kwenda kwa simu ya Mgonjwa
+                </p>
               </button>
 
               <button
                 type="button"
-                onClick={() => setSendChannel("whatsapp")}
-                className={`p-3 rounded-xl border-2 font-bold text-xs flex items-center justify-between transition-all cursor-pointer ${
-                  sendChannel === "whatsapp"
-                    ? "bg-emerald-800 text-white border-emerald-800 shadow-md"
-                    : "bg-white text-gray-700 border-gray-200 hover:border-emerald-700/40"
+                onClick={() => setGatewayChannel("whatsapp")}
+                className={`p-3.5 rounded-xl border-2 text-left transition-all cursor-pointer ${
+                  gatewayChannel === "whatsapp"
+                    ? "border-teal-600 bg-teal-50 text-teal-900 font-bold shadow-sm"
+                    : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300"
                 }`}
               >
-                <div className="flex items-center gap-2.5">
-                  <Smartphone className="w-4 h-4 text-emerald-400" />
-                  <div className="text-left">
-                    <p className="font-extrabold">WhatsApp Direct Link (Bure)</p>
-                    <p className={`text-[10px] ${sendChannel === "whatsapp" ? "text-emerald-100" : "text-gray-400"}`}>
-                      Fungua Chat ya WhatsApp Moja kwa Moja
-                    </p>
-                  </div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-extrabold text-xs">WhatsApp Direct Link (Bure)</span>
+                  {gatewayChannel === "whatsapp" && <CheckCircle2 className="w-4 h-4 text-teal-600" />}
                 </div>
-                {sendChannel === "whatsapp" && <CheckCircle2 className="w-4 h-4 text-secondary" />}
+                <p className="text-[10px] text-gray-500 font-normal">
+                  Fungua Chat ya WhatsApp Moja kwa Moja
+                </p>
               </button>
             </div>
           </div>
 
-          {/* Preset Templates Selector */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-700 block">
-              MIFANO YA DOKEZO NA UJUMBE WA TAYARI (QUICK TEMPLATES):
-            </label>
+          {/* Quick Presets & Message Composition */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-primary" />
+                Mifano ya Dokezo na Ujumbe wa Tayari (Quick Templates)
+              </h2>
+            </div>
+
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() =>
-                  handleSelectPreset(
-                    "Ushauri wa Afya",
-                    "Habari ndugu mgonjwa wetu wa Al-Furqan Herbs Clinic, kumbuka kunywa maji ya kutosha na kufuata ushauri wa daktari..."
-                  )
-                }
-                className="px-3 py-1.5 bg-slate-100 hover:bg-primary/10 hover:text-primary text-gray-700 rounded-lg text-xs font-extrabold border border-slate-200 transition-colors cursor-pointer"
+                onClick={() => applyPresetTemplate("health_tip")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                  selectedCategory === "health_tip"
+                    ? "bg-emerald-700 text-white border-emerald-700 shadow-sm"
+                    : "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                }`}
               >
                 🌿 Ushauri wa Afya
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  handleSelectPreset(
-                    "Kumbukumbu ya Miadi",
-                    "Ndugu {JINA}, tunapenda kukukumbusha kuhusu miadi yako ya kliniki katika Al-Furqan Herbs Clinic. Tafadhali fika kwa wakati..."
-                  )
-                }
-                className="px-3 py-1.5 bg-slate-100 hover:bg-primary/10 hover:text-primary text-gray-700 rounded-lg text-xs font-extrabold border border-slate-200 transition-colors cursor-pointer"
+                onClick={() => applyPresetTemplate("appointment")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                  selectedCategory === "appointment"
+                    ? "bg-primary text-white border-primary shadow-sm"
+                    : "bg-blue-50 text-primary border-blue-200 hover:bg-blue-100"
+                }`}
               >
-                📅 Miadi ya Kliniki
+                📆 Miadi ya Kliniki
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  handleSelectPreset(
-                    "Tiba ya Sunnah",
-                    "Dokezo la Afya (Al-Furqan): Alhijamah (Kuumika) na Tiba za Lishe ya Asili ni kinga na tiba. Karibu kliniki kwetu kupata ushauri bora."
-                  )
-                }
-                className="px-3 py-1.5 bg-slate-100 hover:bg-primary/10 hover:text-primary text-gray-700 rounded-lg text-xs font-extrabold border border-slate-200 transition-colors cursor-pointer"
+                onClick={() => applyPresetTemplate("sunnah_remedy")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                  selectedCategory === "sunnah_remedy"
+                    ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                    : "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                }`}
               >
-                ✨ Dokezo la Tiba ya Sunnah
+                💫 Dokezo la Tiba ya Sunnah
               </button>
             </div>
-          </div>
 
-          {/* Message Body Input */}
-          <div className="bg-white p-5 rounded-2xl border-2 border-primary/20 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-extrabold text-primary uppercase tracking-wider">
-                MWILI WA UJUMBE (MESSAGE BODY)
-              </label>
-              <span className="text-[11px] font-mono text-gray-500 font-bold">
-                {messageBody.length} Wahusika (Chars)
-              </span>
+            <div className="space-y-1.5 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-700 block uppercase">
+                  Mwili wa Ujumbe (Message Body)
+                </label>
+                <span className="text-[11px] text-gray-500 font-mono">
+                  {messageBody.length} Wahusika (Chars)
+                </span>
+              </div>
+              <textarea
+                value={messageBody}
+                onChange={(e) => setMessageBody(e.target.value)}
+                rows={5}
+                className="w-full p-3.5 bg-gray-50 border border-gray-300 rounded-xl text-xs leading-relaxed text-gray-800 outline-none focus:border-primary focus:bg-white transition-all shadow-inner font-sans"
+              />
+              <div className="flex items-center justify-between text-[11px] text-gray-500">
+                <span>* Unaweza kutumia <b>{`{JINA}`}</b> kuweka jina la mgonjwa kiatomati.</span>
+                <span>Mtumaji: <b>{oasisSenderId}</b></span>
+              </div>
             </div>
 
-            <textarea
-              rows={5}
-              value={messageBody}
-              onChange={(e) => setMessageBody(e.target.value)}
-              placeholder="Andika ujumbe wako hapa..."
-              className="w-full p-4 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-gray-800 outline-none focus:border-primary focus:bg-white transition-all shadow-inner leading-relaxed"
-            />
-
-            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500 pt-1 font-medium">
-              <p>
-                * Unaweza kutumia <code>&#123;JINA&#125;</code> kuweka jina la mgonjwa kiatomati.
-              </p>
-              <span className="font-mono text-emerald-700 font-bold">
-                Mtumaji: {oasisSenderId.trim() || "ALFURQAN"}
-              </span>
-            </div>
-          </div>
-
-          {/* Action Trigger Button */}
-          {sendChannel === "whatsapp" && recipientMode === "single" ? (
-            <button
-              type="button"
-              onClick={() => {
-                const target = targetPatients[0];
-                if (target) handleOpenSingleWhatsApp(target);
-              }}
-              className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
-            >
-              <Smartphone className="w-5 h-5 text-white" />
-              <span>Fungua WhatsApp kwa Mgonjwa Huyu</span>
-            </button>
-          ) : (
+            {/* Action Submit Button */}
             <button
               type="button"
               disabled={isSending}
               onClick={handleSendBroadcast}
-              className={`w-full py-4 rounded-xl font-black text-sm uppercase tracking-wider text-white shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              className={`w-full py-3.5 px-6 rounded-xl font-extrabold text-sm text-white shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 isSending
                   ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-primary hover:bg-primary/90 hover:shadow-2xl active:scale-[0.99]"
+                  : "bg-primary hover:bg-primary/90 active:scale-[0.99]"
               }`}
             >
               {isSending ? (
                 <>
-                  <RefreshCw className="w-5 h-5 animate-spin text-secondary" />
-                  <span>Inatuma Ujumbe kwa Wagonjwa ({sendProgress}%)...</span>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Inatuma Ujumbe kwa Walengwa...</span>
                 </>
               ) : (
                 <>
-                  <Send className="w-5 h-5 text-secondary" />
-                  <span>Sambaza Ujumbe kwa Walengwa ({targetCount})</span>
+                  <Send className="w-4 h-4" />
+                  <span>SAMBAZA UJUMBE KWA WALENGWA ({targetList.length})</span>
                 </>
               )}
             </button>
-          )}
-
-          {/* Progress Bar when Sending */}
-          {isSending && (
-            <div className="space-y-1.5 animate-fadeIn">
-              <div className="w-full bg-slate-200 h-3 rounded-full overflow-hidden">
-                <div
-                  className="bg-secondary h-full transition-all duration-300 rounded-full"
-                  style={{ width: `${sendProgress}%` }}
-                />
-              </div>
-              <p className="text-center text-xs font-bold text-primary">
-                Inakamilisha utumaji: {sendProgress}%
-              </p>
-            </div>
-          )}
+          </div>
         </div>
 
-        {/* Right 1 Column: Stats & Live Logs */}
-        <div className="space-y-5">
-          {/* Target Summary Card */}
-          <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-xl space-y-4 border border-slate-800">
-            <h3 className="font-extrabold text-xs text-secondary uppercase tracking-widest border-b border-slate-800 pb-2.5">
-              HALI YA GATEWAY & RECIPIENTS
+        {/* Right Column - Delivery Logs & Gateway Status */}
+        <div className="space-y-6">
+          {/* Gateway Status Summary Widget */}
+          <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-md border border-slate-800 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <span>Hali ya Gateway & Recipients</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             </h3>
 
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between items-center py-1 border-b border-slate-800/80">
-                <span className="text-slate-400 font-medium">Walengwa (Target):</span>
-                <span className="font-extrabold text-white text-sm bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-700">
-                  {targetCount} {targetCount === 1 ? "Mtu" : "Watu"}
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between border-b border-slate-800 pb-1.5">
+                <span className="text-slate-400">Walengwa (Target):</span>
+                <span className="font-bold text-amber-300">{targetList.length} Mtu</span>
+              </div>
+              <div className="flex justify-between border-b border-slate-800 pb-1.5">
+                <span className="text-slate-400">Njia ya Gateway:</span>
+                <span className="font-bold text-emerald-400">
+                  {gatewayChannel === "oasis" ? "Oasis Bulk API" : "WhatsApp Link"}
                 </span>
               </div>
-
-              <div className="flex justify-between items-center py-1 border-b border-slate-800/80">
-                <span className="text-slate-400 font-medium">Njia ya Gateway:</span>
-                <span className="font-bold text-secondary font-mono">
-                  {sendChannel === "oasis" ? "Oasis Bulk API" : "WhatsApp Direct"}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center py-1 border-b border-slate-800/80">
-                <span className="text-slate-400 font-medium">Hadhi ya Server Proxy:</span>
-                <span className="font-bold text-emerald-400 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
+              <div className="flex justify-between border-b border-slate-800 pb-1.5">
+                <span className="text-slate-400">Hadhi ya Server Proxy:</span>
+                <span className="font-bold text-teal-300 flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5" />
                   {useCorsProxy ? "CORS Proxy Enabled" : "Direct Client"}
                 </span>
               </div>
-
-              <div className="flex justify-between items-center py-1">
-                <span className="text-slate-400 font-medium">Siri ya API Key:</span>
-                <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${
-                  oasisApiKey ? "bg-emerald-950 text-emerald-400 border border-emerald-800" : "bg-amber-950 text-amber-400 border border-amber-800"
-                }`}>
+              <div className="flex justify-between pt-0.5">
+                <span className="text-slate-400">Siri ya API Key:</span>
+                <span className={`font-mono font-bold ${oasisApiKey ? "text-emerald-400" : "text-amber-400"}`}>
                   {oasisApiKey ? "Imehifadhiwa (Ready)" : "Simulation Mode"}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Live Delivery Logs */}
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <h3 className="font-extrabold text-xs text-primary uppercase tracking-wider flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-primary" />
-                KUMBUKUMBU ZA UTUMAJI (BROADCAST LOGS)
+          {/* Broadcast Activity Logs */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <History className="w-4 h-4 text-primary" />
+                Kumbukumbu za Utumaji (Broadcast Logs)
               </h3>
-              {logs.length > 0 && (
+              {sendLogs.length > 0 && (
                 <button
-                  onClick={() => setLogs([])}
-                  className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer"
+                  onClick={() => setSendLogs([])}
+                  className="text-[10px] text-red-600 font-bold hover:underline"
                 >
                   Futa Logs
                 </button>
               )}
             </div>
 
-            {logs.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 space-y-1">
-                <MessageSquare className="w-8 h-8 mx-auto text-gray-300" />
-                <p className="text-xs font-bold">Bado hujatuma ujumbe wowote leo.</p>
-                <p className="text-[10px]">Kila ujumbe utakaotuma utaonekana hapa papo hapo.</p>
+            {sendLogs.length === 0 ? (
+              <div className="text-center py-8 text-gray-400 space-y-2">
+                <Clock className="w-8 h-8 mx-auto stroke-[1.5]" />
+                <p className="text-xs font-medium">Bado hujatuma ujumbe wowote katika kipindi hiki.</p>
               </div>
             ) : (
-              <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
-                {logs.map((log) => (
+              <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                {sendLogs.map((log) => (
                   <div
                     key={log.id}
-                    className={`p-3 rounded-xl border text-xs space-y-1 ${
+                    className={`p-3 rounded-xl border text-xs space-y-1 transition-all ${
                       log.status === "success"
-                        ? "bg-emerald-50/60 border-emerald-200 text-emerald-900"
-                        : "bg-red-50/60 border-red-200 text-red-900"
+                        ? "bg-emerald-50/60 border-emerald-200 text-emerald-950"
+                        : "bg-rose-50/60 border-rose-200 text-rose-950"
                     }`}
                   >
                     <div className="flex items-center justify-between font-bold">
-                      <span className="truncate max-w-[180px]">{log.recipient}</span>
-                      <span className="text-[10px] text-gray-500 font-mono">{log.time}</span>
+                      <span className="flex items-center gap-1.5">
+                        {log.status === "success" ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                        )}
+                        {log.recipientName} ({log.phone})
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-mono">{log.timestamp}</span>
                     </div>
-                    <p className="text-[11px] font-medium leading-tight text-gray-700">
+                    <p className="text-[11px] text-gray-600 pl-5 font-mono break-all leading-relaxed">
                       {log.details}
                     </p>
                   </div>
@@ -800,8 +880,7 @@ export default function BroadcastCenter({ patients }: BroadcastCenterProps) {
             )}
           </div>
         </div>
-
       </div>
     </div>
   );
-                               }
+};
