@@ -16,8 +16,15 @@ export default async function handler(req, res) {
   try {
     const { apiKey, from, to, text, baseUrl } = req.body;
     
-    // Tumia URL ile ile sahihi inayotumiwa na fomu ya usajili
-    const targetUrl = baseUrl || 'https://bulksms.oasistech.co.tz/api/sms';
+    // Safisha baseUrl isome URL sahihi tu bila kujirudia
+    let targetUrl = 'https://bulksms.oasistech.co.tz/api/sms';
+    if (baseUrl && baseUrl.startsWith('http')) {
+      // Chagua ile URL ya kwanza tu kama zimegongana
+      targetUrl = baseUrl.split(']')[0].replace('[', '').trim();
+      if (!targetUrl.startsWith('http')) {
+        targetUrl = 'https://bulksms.oasistech.co.tz/api/sms';
+      }
+    }
 
     let simu = Array.isArray(to) ? to[0] : to;
     simu = String(simu).trim();
