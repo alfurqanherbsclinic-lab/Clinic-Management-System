@@ -347,17 +347,17 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
 
 
-                        const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
+                            const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
     
-    // Sanifu kifurushi chako cha kwenda Oasis hapa moja kwa moja
     const payload = {
       from: sender,
       to: [recipientPhone],
       text: textToDeliver
     };
 
-    let isSuccess = false;
-    let responseDetails = "";
+    // Tumia moja kwa moja bila kuweka neno "let" tena hapa
+    isSuccess = false;
+    responseDetails = "";
 
     try {
       const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
@@ -390,6 +390,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
       const errStr = err instanceof Error ? err.message : String(err);
       responseDetails = `Hitilafu ya mtandao: ${errStr}`;
     }
+
 
 
 
