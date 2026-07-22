@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { Patient } from "../types";
 import BroadcastCenter from "./BroadcastCenter";
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "../lib/firebase";
 
 interface PatientAvatarProps {
   src: string;
@@ -278,11 +280,16 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
         };
 
         console.log("Saving data to Firebase:", taarifaZaUkumbusho);
+        
+        // Hifadhi moja kwa moja kwenye Firebase Firestore Database
+        await addDoc(collection(db, "patient_reminders"), taarifaZaUkumbusho);
+
         setReminderActive(true);
-        setReminderStatus(`Vikumbusho otomatiki vya siku ${sikuZilizochaguliwa} vimewashwa kwa ajili ya ${jinaInput}.`);
-        alert(`Imefaulu! Vikumbusho vya siku ${sikuZilizochaguliwa} vimewashwa kwa ajili ya ${jinaInput}.`);
+        setReminderStatus(`Vikumbusho otomatiki vya siku ${sikuZilizochaguliwa} vimewashwa na kuhifadhiwa kwenye database kwa ajili ya ${jinaInput}.`);
+        alert(`Imefaulu! Vikumbusho vya siku ${sikuZilizochaguliwa} vimewashwa na kuhifadhiwa kikamilifu kwenye Firebase Database kwa ajili ya ${jinaInput}.`);
     } catch (error: any) {
-        alert("Imeshindikana kuhifadhi vikumbusho: " + error.message);
+        console.error("Firebase save error:", error);
+        alert("Imeshindikana kuhifadhi vikumbusho kwenye Firebase: " + error.message);
     }
   };
 
