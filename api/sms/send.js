@@ -22,31 +22,34 @@ export default async function handler(req, res) {
       let num = String(to[0]).trim();
       if (num.startsWith('0')) {
         num = '255' + num.substring(1);
+      } else if (num.startsWith('+')) {
+        num = num.substring(1);
       }
       formattedTo = num;
     } else if (typeof to === 'string') {
       let num = to.trim();
       if (num.startsWith('0')) {
         num = '255' + num.substring(1);
+      } else if (num.startsWith('+')) {
+        num = num.substring(1);
       }
       formattedTo = num;
     }
 
-    // Muundo sahihi wa viwango vya API za Oasis Bulk SMS
+    // Muundo wa moja kwa moja unaokubaliwa na mifumo mingi ya ndani ya gateway
     const oasisPayload = {
       source_addr: from,
-      enqueuetime: "",
-      encoding: 0,
-      message: text,
-      recipients: [
+      schedule_time: "",
+      messages: [
         {
-          recipient_id: 1,
-          dest_addr: formattedTo
+          dest_addr: formattedTo,
+          message_id: 1,
+          text: text
         }
       ]
     };
 
-    console.log("Sending to Oasis (Official Payload):", targetUrl, oasisPayload);
+    console.log("Sending to Oasis (Messages Array):", targetUrl, oasisPayload);
 
     const response = await fetch(targetUrl, {
       method: 'POST',
