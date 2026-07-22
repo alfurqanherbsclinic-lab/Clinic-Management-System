@@ -359,21 +359,25 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     isSuccess = false;
     responseDetails = "";
 
-    try {
-      const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-      
-      const resp = await fetch(publicProxyUrl, {
+        try {
+      // Tunatuma ombi kwenda kwenye API yetu ya ndani ya Vercel (/api/sms/send)
+      const resp = await fetch("/api/sms/send", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${oasisApiKey.trim()}`,
           "Accept": "application/json"
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          apiKey: oasisApiKey.trim(),
+          from: sender,
+          to: [recipientPhone],
+          text: textToDeliver,
+          baseUrl: oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send"
+        })
       });
 
       const rawText = await resp.text();
-      let parsedJson: any = null;
+      let parsedJson: any = null; // Hapa badilisha kutoka nil iwe null
       try {
         parsedJson = JSON.parse(rawText);
       } catch {}
@@ -390,6 +394,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
       const errStr = err instanceof Error ? err.message : String(err);
       responseDetails = `Hitilafu ya mtandao: ${errStr}`;
     }
+
 
 
 
