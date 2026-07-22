@@ -45,7 +45,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     return (!saved || saved === "ALFURQAN") ? "AHC MKONONI" : saved;
   });
   const [oasisBaseUrl, setOasisBaseUrl] = useState<string>(() => {
-    return localStorage.getItem("oasis_base_url") || "https://bulksms.oasistech.co.tz/api/sms/send";
+    return localStorage.getItem("oasis_base_url") || "https://api.oasistech.co.tz/v1/sms/send";
   });
   const [useCorsProxy, setUseCorsProxy] = useState<boolean>(() => {
     return localStorage.getItem("oasis_use_cors_proxy") !== "false";
@@ -64,6 +64,13 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
   // Sending States & Logs
   const [isSending, setIsSending] = useState<boolean>(false);
+  const [isTestingApi, setIsTestingApi] = useState<boolean>(false);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    statusCode?: number;
+    rawResponse?: string;
+    message: string;
+  } | null>(null);
   const [sendingProgress, setSendingProgress] = useState<number>(0);
   const [sendingLog, setSendingLog] = useState<{ name: string; phone: string; status: "success" | "failed"; time: string; details?: string }[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -202,6 +209,71 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     window.open(waUrl, "_blank", "noopener,noreferrer");
   };
 
+  // Test Connection with Oasis API
+  const handleTestOasisConnection = async () => {
+    if (!oasisApiKey.trim()) {
+      setErrorMessage("Tafadhali ingiza Oasis API Key hapo juu ili kuweza kupima muunganiko!");
+      setShowApiSettings(true);
+      return;
+    }
+
+    setIsTestingApi(true);
+    setTestResult(null);
+    setErrorMessage(null);
+
+    const testPhone = "255712000000";
+    const sender = oasisSenderId.trim() || "AHC MKONONI";
+    const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
+
+    try {
+      const resp = await fetch("/api/sms/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          apiKey: oasisApiKey.trim(),
+          sender_id: sender,
+          recipient: testPhone,
+          message: "Jaribio la muunganiko wa mfumo wa Al-Furqan Herbs Clinic na Oasis SMS Gateway.",
+          baseUrl: targetUrl
+        })
+      });
+
+      const rawText = await resp.text();
+      let parsedJson: any = null;
+      try {
+        parsedJson = JSON.parse(rawText);
+      } catch {}
+
+      if (resp.ok) {
+        setTestResult({
+          success: true,
+          statusCode: resp.status,
+          rawResponse: rawText,
+          message: `âœ… Muunganiko na Oasis Umefanikiwa! Server imerejesha HTTP ${resp.status}. Majibu ya Oasis: ${extractErrorMessage(parsedJson, rawText)}`
+        });
+      } else {
+        const errorMsg = extractErrorMessage(parsedJson, rawText);
+        setTestResult({
+          success: false,
+          statusCode: resp.status,
+          rawResponse: rawText,
+          message: `âŒ Oasis Gateway Imerejesha Majibu Yenye Makosa (HTTP ${resp.status}): ${errorMsg}. Tafadhali hakikisha API Key yako ni sahihi, Sender ID ('${sender}') imesajiliwa Oasis, na salio la SMS lipo.`
+        });
+      }
+    } catch (err: unknown) {
+      const errStr = err instanceof Error ? err.message : String(err);
+      setTestResult({
+        success: false,
+        message: `Hitilafu ya Kuunganisha: ${errStr}`
+      });
+    } finally {
+      setIsTestingApi(false);
+    }
+  };
+
   // Send Bulk / Single via Oasis Technologies SMS API
   const handleSendOasisSMS = async () => {
     if (!messageBody.trim()) {
@@ -214,15 +286,20 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
       return;
     }
 
+    const hasApiKey = oasisApiKey.trim().length > 0;
+    if (!hasApiKey) {
+      setShowApiSettings(true);
+      setErrorMessage("âš ï¸ API Key ya Oasis haijawekwa! Ili SMS zitoke kwenda Oasis na ziwafikie wateja kwenye simu, lazima uingize API Key yako kwanza kwenye Mipangilio ya Oasis API Key hapo juu.");
+      return;
+    }
+
     setIsSending(true);
     setSendingProgress(0);
     setSendingLog([]);
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const hasApiKey = oasisApiKey.trim().length > 0;
     const sender = oasisSenderId.trim() || "AHC MKONONI";
-
     const logs: { name: string; phone: string; status: "success" | "failed"; time: string; details?: string }[] = [];
 
     for (let i = 0; i < targetPatients.length; i++) {
@@ -231,113 +308,107 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
       const textToDeliver = messageBody.replace(/\{JINA\}/g, patient.name).replace(/\{CARD_NO\}/g, patient.cardNumber);
 
       // Simulate network request delay for realistic UI feedback
-      await new Promise((res) => setTimeout(res, 600));
+      await new Promise((res) => setTimeout(res, 500));
 
       let isSuccess = false;
       let responseDetails = "";
 
-      if (hasApiKey) {
-        try {
-          let response: Response | null = null;
-          const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
-          const payload = {
-            sender_id: sender,
-            recipient: recipientPhone,
-            message: textToDeliver
-          };
+      try {
+        let response: Response | null = null;
+        const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
+        const payload = {
+          sender_id: sender,
+          recipient: recipientPhone,
+          message: textToDeliver
+        };
 
-          if (useCorsProxy) {
-            // Attempt 1: Try local server proxy (/api/sms/send)
-            try {
-              const proxyResp = await fetch("/api/sms/send", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Accept": "application/json"
-                },
-                body: JSON.stringify({
-                  apiKey: oasisApiKey.trim(),
-                  sender_id: sender,
-                  recipient: recipientPhone,
-                  message: textToDeliver,
-                  baseUrl: targetUrl
-                })
-              });
-
-              if (proxyResp.status !== 404 && proxyResp.status !== 405) {
-                response = proxyResp;
-              }
-            } catch (pErr) {
-              // Local proxy endpoint not available
-            }
-
-            // Attempt 2: If local server proxy missing (e.g. static hosting on Vercel), try Public CORS proxy
-            if (!response) {
-              try {
-                const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-                response = await fetch(publicProxyUrl, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${oasisApiKey.trim()}`,
-                    "Accept": "application/json"
-                  },
-                  body: JSON.stringify(payload)
-                });
-              } catch (pubErr) {
-                // Public proxy failed, will try direct fetch
-              }
-            }
-          }
-
-          // Attempt 3: Direct fetch fallback if no proxy response was received
-          if (!response) {
-            response = await fetch(targetUrl, {
+        if (useCorsProxy) {
+          // Attempt 1: Try local server proxy (/api/sms/send)
+          try {
+            const proxyResp = await fetch("/api/sms/send", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${oasisApiKey.trim()}`,
                 "Accept": "application/json"
               },
-              body: JSON.stringify(payload)
+              body: JSON.stringify({
+                apiKey: oasisApiKey.trim(),
+                sender_id: sender,
+                recipient: recipientPhone,
+                message: textToDeliver,
+                baseUrl: targetUrl
+              })
             });
-          }
 
-          if (response.ok) {
-            const data = await response.json().catch(() => ({}));
-            isSuccess = true;
-            const msg = extractErrorMessage(data, `Ujumbe umewasilishwa kwa mafanikio (${recipientPhone})`);
-            responseDetails = msg;
-          } else {
-            let errData: any = {};
-            const contentType = response.headers.get("content-type") || "";
-            if (contentType.includes("application/json")) {
-              errData = await response.json().catch(() => ({}));
-            } else {
-              const txt = await response.text().catch(() => "");
-              errData = txt;
+            if (proxyResp.status !== 404 && proxyResp.status !== 405) {
+              response = proxyResp;
             }
-
-            const cleanMsg = extractErrorMessage(errData, `HTTP ${response.status} kutoka Oasis Gateway`);
-            isSuccess = false;
-            responseDetails = `Hitilafu ya Oasis: ${cleanMsg}`;
+          } catch (pErr) {
+            // Local proxy endpoint not available
           }
-        } catch (err: unknown) {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          const isCorsError = errMsg.toLowerCase().includes("failed to fetch") || errMsg.toLowerCase().includes("networkerror");
-          
-          if (isCorsError) {
-            isSuccess = false;
-            responseDetails = `Kizuizi cha Kivinjari (CORS Error): Server ya Oasis inakataa maombi ya moja kwa moja. Mfumo unatumia Server Proxy kurekebisha hili.`;
-          } else {
-            isSuccess = false;
-            responseDetails = `Hitilafu ya Mtandao: ${errMsg}`;
+
+          // Attempt 2: If local server proxy missing (e.g. static hosting on Vercel), try Public CORS proxy
+          if (!response) {
+            try {
+              const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+              response = await fetch(publicProxyUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${oasisApiKey.trim()}`,
+                  "Accept": "application/json"
+                },
+                body: JSON.stringify(payload)
+              });
+            } catch (pubErr) {
+              // Public proxy failed, will try direct fetch
+            }
           }
         }
-      } else {
-        // Mode without API key configured yet (Simulation Mode)
-        isSuccess = true;
-        responseDetails = `Njia ya Majaribio (Weka API Key na chagua Server Proxy kutuma SMS za kweli)`;
+
+        // Attempt 3: Direct fetch fallback if no proxy response was received
+        if (!response) {
+          response = await fetch(targetUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${oasisApiKey.trim()}`,
+              "Accept": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+        }
+
+        if (response.ok) {
+          const data = await response.json().catch(() => ({}));
+          isSuccess = true;
+          const msg = extractErrorMessage(data, `Ujumbe umewasilishwa Oasis kwa mafanikio (${recipientPhone})`);
+          responseDetails = `HTTP ${response.status}: ${msg}`;
+        } else {
+          let errData: any = {};
+          const contentType = response.headers.get("content-type") || "";
+          if (contentType.includes("application/json")) {
+            errData = await response.json().catch(() => ({}));
+          } else {
+            const txt = await response.text().catch(() => "");
+            errData = txt;
+          }
+
+          const cleanMsg = extractErrorMessage(errData, `HTTP ${response.status} kutoka Oasis Gateway`);
+          isSuccess = false;
+          responseDetails = `Hitilafu ya Oasis (HTTP ${response.status}): ${cleanMsg}`;
+        }
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        const isCorsError = errMsg.toLowerCase().includes("failed to fetch") || errMsg.toLowerCase().includes("networkerror");
+        
+        if (isCorsError) {
+          isSuccess = false;
+          responseDetails = `Kizuizi cha Kivinjari (CORS Error): Server ya Oasis inakataa maombi ya moja kwa moja. Mfumo unatumia Server Proxy kurekebisha hili.`;
+        } else {
+          isSuccess = false;
+          responseDetails = `Hitilafu ya Mtandao: ${errMsg}`;
+        }
       }
 
       const logItem = {
@@ -354,10 +425,15 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     }
 
     setIsSending(false);
-    if (hasApiKey) {
-      setSuccessMessage(`Ujumbe umetumwa vyema kwa wagonjwa ${targetPatients.length} kupitia Oasis Technologies SMS Gateway!`);
+    const successfulCount = logs.filter(l => l.status === "success").length;
+    const failedCount = logs.filter(l => l.status === "failed").length;
+
+    if (failedCount === 0) {
+      setSuccessMessage(`Ujumbe umewasilishwa kwa mafanikio kwa wagonjwa wote ${successfulCount} kupitia Oasis Technologies SMS Gateway!`);
+    } else if (successfulCount > 0) {
+      setSuccessMessage(`Ujumbe umewasilishwa kwa wagonjwa ${successfulCount}. Hata hivyo, wagonjwa ${failedCount} walipata hitilafu (Angalia kumbukumbu upande wa kulia).`);
     } else {
-      setSuccessMessage(`Majaribio ya utumaji wa ujumbe kwa wagonjwa ${targetPatients.length} yamekamilika! Ili kutuma SMS halisi, weka API Key ya Oasis Technologies hapo juu.`);
+      setErrorMessage(`Utumaji kwenda Oasis umefeli kwa wagonjwa wote. Sababu kuu: ${logs[0]?.details || "Hujaiweka API Key au Sender ID 'AHC MKONONI' haijasajiliwa Oasis"}`);
     }
   };
 
@@ -519,10 +595,73 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
             </div>
           </div>
 
+          {/* Test Connection Button & Result Display */}
+          <div className="bg-white p-3 rounded-xl border border-amber-200/80 space-y-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-black text-gray-800">
+                  JARIBU MUUNGANIKO WA OASIS API (TEST CONNECTION)
+                </p>
+                <p className="text-[10px] text-gray-500">
+                  Pima ikiwa API Key na Sender ID '<strong>{oasisSenderId}</strong>' zinafanya kazi na Oasis.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={isTestingApi}
+                onClick={handleTestOasisConnection}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                {isTestingApi ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Inapima...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-3.5 h-3.5 text-amber-200" />
+                    <span>Jaribu Muunganiko Sasa</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {testResult && (
+              <div
+                className={`p-3 rounded-lg text-xs font-semibold space-y-1.5 animate-fadeIn ${
+                  testResult.success
+                    ? "bg-emerald-50 border border-emerald-300 text-emerald-900"
+                    : "bg-rose-50 border border-rose-300 text-rose-900"
+                }`}
+              >
+                <div className="flex items-center gap-2 font-black">
+                  {testResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-600" />
+                  )}
+                  <span>{testResult.message}</span>
+                </div>
+
+                {testResult.rawResponse && (
+                  <details className="mt-1">
+                    <summary className="text-[10px] font-mono cursor-pointer text-gray-600 hover:underline">
+                      Onyesha Raw JSON Response kutoka Oasis Server
+                    </summary>
+                    <pre className="p-2 bg-black/80 text-emerald-300 rounded font-mono text-[10px] overflow-x-auto mt-1 whitespace-pre-wrap">
+                      {testResult.rawResponse}
+                    </pre>
+                  </details>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center justify-between text-[11px] text-amber-900 bg-white/80 p-2.5 rounded-lg border border-amber-200">
             <span className="flex items-center gap-1.5 font-semibold">
               <Info className="w-4 h-4 text-amber-600 flex-shrink-0" />
-              Ikiwa huna API Key bado, mfumo utakuruhusu kufanya majaribio ya Simulation bila kukwama.
+              Ingiza API Key ya Oasis hapo juu ili SMS zitoke kwenda kwenye website ya Oasis.
             </span>
             <button
               onClick={() => setShowApiSettings(false)}
@@ -785,32 +924,54 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
           {/* Action Button Section matching screenshot */}
           {sendChannel === "oasis" ? (
-            <button
-              type="button"
-              disabled={isSending}
-              onClick={handleSendOasisSMS}
-              className={`w-full py-3.5 px-6 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider text-white shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                isSending
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-rose-600 hover:bg-rose-700 active:scale-[0.99]"
-              }`}
-            >
-              {isSending ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Inatuma Ujumbe... ({sendingProgress}%)</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  <span>
-                    {recipientMode === "bulk"
-                      ? `Sambaza Ujumbe kwa Wagonjwa Wote (${targetCount})`
-                      : `Tuma Ujumbe kwa Mgonjwa Aliyechaguliwa`}
-                  </span>
-                </>
+            <div className="space-y-2">
+              {!oasisApiKey.trim() && (
+                <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-xl text-xs text-amber-900 font-semibold flex items-start gap-2 animate-fadeIn">
+                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-extrabold text-amber-950">âš ï¸ TANBIHI: Oasis API Key Haijawekwa!</p>
+                    <p className="text-[11px] leading-relaxed">
+                      Ili SMS hizi zifike kwenye website ya Oasis Technology na ziwafikie wateja kwenye simu, bofya{" "}
+                      <button
+                        type="button"
+                        onClick={() => setShowApiSettings(true)}
+                        className="underline font-black text-amber-800 hover:text-amber-950 cursor-pointer"
+                      >
+                        'Weka API Key ya Oasis SMS'
+                      </button>{" "}
+                      hapo juu na uingize Oasis API Key yako na Sender ID <strong>AHC MKONONI</strong>.
+                    </p>
+                  </div>
+                </div>
               )}
-            </button>
+
+              <button
+                type="button"
+                disabled={isSending}
+                onClick={handleSendOasisSMS}
+                className={`w-full py-3.5 px-6 rounded-xl font-black text-xs sm:text-sm uppercase tracking-wider text-white shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  isSending
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-rose-600 hover:bg-rose-700 active:scale-[0.99]"
+                }`}
+              >
+                {isSending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Inatuma Ujumbe... ({sendingProgress}%)</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>
+                      {recipientMode === "bulk"
+                        ? `Sambaza Ujumbe kwa Wagonjwa Wote (${targetCount})`
+                        : `Tuma Ujumbe kwa Mgonjwa Aliyechaguliwa`}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
           ) : (
             <div className="space-y-3">
               {recipientMode === "single" ? (
@@ -959,22 +1120,51 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
           {/* Sending Progress / Realtime Logs */}
           {sendingLog.length > 0 && (
-            <div className="bg-white border-2 border-primary/20 p-4 rounded-2xl space-y-3">
-              <h4 className="text-xs font-black text-primary uppercase tracking-wider flex items-center justify-between">
-                <span>Kumbukumbu za Utumaji ({sendingLog.length})</span>
+            <div className="bg-white border-2 border-primary/20 p-4 rounded-2xl space-y-3 shadow-xs">
+              <h4 className="text-xs font-black text-primary uppercase tracking-wider flex items-center justify-between border-b border-gray-100 pb-2">
+                <span>Kumbukumbu za Utumaji Oasis ({sendingLog.length})</span>
                 <RefreshCw className={`w-3.5 h-3.5 ${isSending ? "animate-spin text-rose-600" : "text-emerald-600"}`} />
               </h4>
 
-              <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 text-[11px]">
+              <div className="max-h-64 overflow-y-auto space-y-2 pr-1 text-[11px]">
                 {sendingLog.map((log, idx) => (
-                  <div key={idx} className="p-2 bg-slate-50 rounded border border-slate-200 flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-primary">{log.name}</p>
-                      <p className="text-[9px] text-gray-400 font-mono">{log.phone} â€¢ {log.time}</p>
+                  <div
+                    key={idx}
+                    className={`p-2.5 rounded-xl border flex flex-col gap-1 transition-all ${
+                      log.status === "success"
+                        ? "bg-emerald-50/70 border-emerald-200 text-emerald-950"
+                        : "bg-rose-50/70 border-rose-200 text-rose-950"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-primary uppercase">{log.name}</span>
+                      <span
+                        className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${
+                          log.status === "success"
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                            : "bg-rose-100 text-rose-800 border-rose-300"
+                        }`}
+                      >
+                        {log.status === "success" ? "âœ“ Imewasilishwa Oasis" : "âœ• Hitilafu"}
+                      </span>
                     </div>
-                    <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                      âœ“ Sent
-                    </span>
+
+                    <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono">
+                      <span>{log.phone}</span>
+                      <span>{log.time}</span>
+                    </div>
+
+                    {log.details && (
+                      <p
+                        className={`text-[10px] font-medium leading-tight p-1.5 rounded border mt-0.5 ${
+                          log.status === "success"
+                            ? "bg-white/80 text-emerald-800 border-emerald-200"
+                            : "bg-white/80 text-rose-800 border-rose-200"
+                        }`}
+                      >
+                        {log.details}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
