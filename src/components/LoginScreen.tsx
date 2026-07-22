@@ -255,7 +255,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
           setBiometricScanning(false);
           setScanSuccess(false);
           onIncrementAttempts();
-          setBiometricError("❌ ALAMA YA KIDOLE HAIJASAJILIWA! Access Denied. Mtu huyu hana ruhusa ya kuingia kwenye mfumo wa Al-Furqan.");
+          setBiometricError("âŒ ALAMA YA KIDOLE HAIJASAJILIWA! Access Denied. Mtu huyu hana ruhusa ya kuingia kwenye mfumo wa Al-Furqan.");
           setBiometricStatus("");
         }, 1500);
 
@@ -305,21 +305,21 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
   };
 
   return (
-    <div className="fixed inset-0 w-full h-full bg-slate-100 z-[9999] flex justify-center items-center p-4 overflow-y-auto font-sans">
+    <div className="fixed inset-0 w-full h-full bg-slate-100/95 z-[9999] overflow-y-auto font-sans py-4 sm:py-8 px-2 sm:px-4 flex justify-center items-start sm:items-center">
       {/* Decorative background elements */}
-      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#D6145A]/5 blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#D6145A]/5 blur-3xl pointer-events-none" />
+      <div className="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#D6145A]/5 blur-3xl pointer-events-none" />
+      <div className="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#D6145A]/5 blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-4xl bg-white rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.08)] border border-slate-100 overflow-hidden min-h-[620px] flex flex-col justify-between">
+      <div className="w-full max-w-4xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col justify-between relative z-10">
         
         {/* Navigation Tabs at top to switch between Login and Register Biometrics */}
-        <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="bg-slate-50 border-b border-slate-100 px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-[#D6145A]" />
-            <span className="text-xs font-black text-slate-800 tracking-wider uppercase">AL-FURQAN BIOMETRIC CLINIC HIS</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#D6145A]" />
+            <span className="text-[11px] sm:text-xs font-black text-slate-800 tracking-wider uppercase">AL-FURQAN BIOMETRIC CLINIC HIS</span>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-200/60 p-1 rounded-xl">
+          <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-xl">
             <button
               onClick={() => {
                 setActiveTab("login");
@@ -327,9 +327,9 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                 setBiometricStatus("");
                 setScanSuccess(false);
               }}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === "login"
-                  ? "bg-white text-[#D6145A] shadow-sm"
+                  ? "bg-white text-[#D6145A] shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -343,9 +343,9 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                 setRegErrorMsg("");
                 setRegSuccessMsg("");
               }}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === "register"
-                  ? "bg-[#D6145A] text-white shadow-sm"
+                  ? "bg-[#D6145A] text-white shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -360,10 +360,10 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
           <div className="grid grid-cols-1 md:grid-cols-12 flex-1">
             
             {/* Left Section: Core Credentials Form (7 columns) */}
-            <div className="md:col-span-7 p-8 flex flex-col justify-between border-r border-slate-50">
+            <div className="md:col-span-7 p-5 sm:p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-100">
               <div>
                 
-                {/* 🌟 RETURNED ORIGINAL CLINIC LOGO CONTAINER CENTRED PERFECTLY 🌟 */}
+                {/* ðŸŒŸ RETURNED ORIGINAL CLINIC LOGO CONTAINER CENTRED PERFECTLY ðŸŒŸ */}
                 <div className="flex justify-center mb-6">
                   <div className="flex flex-col items-center">
                     <img 
@@ -463,7 +463,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           className="w-full p-3 pl-11 pr-11 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-[#D6145A]/20 focus:border-[#D6145A] transition-all"
-                          placeholder="••••••••"
+                          placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                           required
                         />
                         <button
@@ -551,7 +551,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
 
               <div className="mt-6 pt-4 border-t border-slate-100 text-left flex justify-between items-center">
                 <span className="text-[9px] text-slate-400 font-bold font-mono">
-                  IP: 192.168.1.102 • Node Verified
+                  IP: 192.168.1.102 â€¢ Node Verified
                 </span>
                 <span className="text-[9px] text-slate-400 font-bold font-mono">
                   SSL Active
@@ -596,14 +596,14 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                     <optgroup label="WAFANYAKAZI WALIOSAJILIWA">
                       {registeredStaff.map(staff => (
                         <option key={staff.id} value={staff.id}>
-                          ☝️ Kidole cha: {staff.name} ({staff.role})
+                          â˜ï¸ Kidole cha: {staff.name} ({staff.role})
                         </option>
                       ))}
                     </optgroup>
 
                     <optgroup label="MGENI / MTU ASASAJILIWA (REJECT TEST)">
                       <option value="unauthorized_finger">
-                        🚨 Kidole kisichosajiliwa (Any unregistered person)
+                        ðŸš¨ Kidole kisichosajiliwa (Any unregistered person)
                       </option>
                     </optgroup>
                   </select>
@@ -687,7 +687,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                 {biometricError ? (
                   <div className="bg-rose-50 border border-rose-100 p-2.5 rounded-xl">
                     <p className="text-[10px] font-bold text-[#D6145A] leading-tight text-center">
-                      ⚠️ {biometricError}
+                      âš ï¸ {biometricError}
                     </p>
                   </div>
                 ) : biometricStatus ? (
@@ -713,7 +713,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
               
               <div className="text-center mb-6">
                 <span className="px-3 py-1 bg-[#D6145A]/10 text-[#D6145A] text-[10px] font-black rounded-full uppercase tracking-wider">
-                  🔐 Sehemu Maalumu ya Usajili (Biometric Registration Desk)
+                  ðŸ” Sehemu Maalumu ya Usajili (Biometric Registration Desk)
                 </span>
                 <h3 className="text-2xl font-black text-slate-800 tracking-tight mt-2">Usajili wa Mfanyakazi Mpya</h3>
                 <p className="text-xs text-slate-500 font-medium">Sajili taarifa za mfanyakazi na uhifadhi alama ya kidole chake ili aweze kutumia biometric kuingia kwenye mfumo.</p>
@@ -772,7 +772,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                     <input
                       type="password"
                       required
-                      placeholder="••••••••"
+                      placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
                       className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-[#D6145A]/20"
@@ -845,7 +845,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                       {regScanning 
                         ? "Soma kidole... Tafadhali weka kidole chako" 
                         : regBiometricRegistered 
-                        ? "✅ ALAMA YA KIDOLE IMEREKODIWA!" 
+                        ? "âœ… ALAMA YA KIDOLE IMEREKODIWA!" 
                         : "GUSA HAPA KUSOMA KIDOLE CHAKO"}
                     </h5>
                     
@@ -875,7 +875,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                 }}
                 className="text-xs text-[#D6145A] hover:underline font-bold"
               >
-                ← Ghairi na urudi kwenye Ukurasa wa Kuingia (Login)
+                â† Ghairi na urudi kwenye Ukurasa wa Kuingia (Login)
               </button>
             </div>
           </div>
@@ -884,7 +884,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
         {/* Footer info brand */}
         <div className="bg-slate-50 border-t border-slate-100 py-3.5 px-6 text-center">
           <p className="text-[9px] text-slate-400 font-extrabold tracking-widest uppercase">
-            AL-FURQAN CLINIC PORTAL SYSTEM • ALL RIGHTS RESERVED 2026
+            AL-FURQAN CLINIC PORTAL SYSTEM â€¢ ALL RIGHTS RESERVED 2026
           </p>
         </div>
 
