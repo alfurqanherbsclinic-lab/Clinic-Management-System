@@ -45,7 +45,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     return (!saved || saved === "ALFURQAN") ? "AHC MKONONI" : saved;
   });
   const [oasisBaseUrl, setOasisBaseUrl] = useState<string>(() => {
-    return localStorage.getItem("oasis_base_url") || "https://api.oasistech.co.tz/v1/sms/send";
+    return localStorage.getItem("oasis_base_url") || "https://bulksms.oasistech.co.tz/api/sms/send";
   });
   const [useCorsProxy, setUseCorsProxy] = useState<boolean>(() => {
     return localStorage.getItem("oasis_use_cors_proxy") !== "false";
