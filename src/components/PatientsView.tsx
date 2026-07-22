@@ -21,7 +21,8 @@ import {
 import { Patient } from "../types";
 import BroadcastCenter from "./BroadcastCenter";
 import { collection, addDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { ... } from "../lib/firebase";
+
 
 interface PatientAvatarProps {
   src: string;
