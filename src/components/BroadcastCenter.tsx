@@ -316,11 +316,12 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
       try {
         let response: Response | null = null;
         const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
-        const payload = {
-          sender_id: sender,
-          recipient: recipientPhone,
-          message: textToDeliver
-        };
+            const payload = {
+      from: sender,         // Badala ya sender_id
+      to: [recipientPhone], // Lazima iwe ndani ya array ya []
+      text: textToDeliver   // Badala ya message
+    };
+
 
         if (useCorsProxy) {
           // Attempt 1: Try local server proxy (/api/sms/send)
