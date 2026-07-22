@@ -25,7 +25,7 @@ function oasisSmsProxyPlugin(): Plugin {
             const body = JSON.parse(bodyStr || '{}');
             const { apiKey, sender_id, recipient, message, baseUrl } = body;
 
-            // Target URL - default to standard Oasis API endpoint
+            // Target URL - default to standard Oasis API endpoint or custom provided endpoint
             const targetUrl = baseUrl || 'https://api.oasistech.co.tz/v1/sms/send';
 
             // Forward request from server to Oasis Tech server (Server-to-Server bypasses browser CORS)
@@ -73,10 +73,6 @@ export default defineConfig(() => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
-    },
-    server: {
-      hmr: process.env.DISABLE_HMR !== 'true',
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };
 });
