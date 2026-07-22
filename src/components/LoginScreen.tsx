@@ -463,7 +463,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           className="w-full p-3 pl-11 pr-11 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-[#D6145A]/20 focus:border-[#D6145A] transition-all"
-                          placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                          placeholder="********"
                           required
                         />
                         <button
@@ -884,7 +884,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
         {/* Footer info brand */}
         <div className="bg-slate-50 border-t border-slate-100 py-3.5 px-6 text-center">
           <p className="text-[9px] text-slate-400 font-extrabold tracking-widest uppercase">
-            AL-FURQAN CLINIC PORTAL SYSTEM â€¢ ALL RIGHTS RESERVED 2026
+            AL-FURQAN CLINIC PORTAL SYSTEM | ALL RIGHTS RESERVED 2026
           </p>
         </div>
 
