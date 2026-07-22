@@ -15,50 +15,33 @@ export default async function handler(req, res) {
 
   try {
     const { apiKey, from, to, text, baseUrl } = req.body;
-    const targetUrl = baseUrl || 'https://api.oasistech.co.tz/v1/sms/send';
+    
+    // Tumia URL ile ile sahihi inayotumiwa na fomu ya usajili
+    const targetUrl = baseUrl || 'https://bulksms.oasistech.co.tz/api/sms';
 
-    let formattedTo = to;
-    if (Array.isArray(to) && to.length > 0) {
-      let num = String(to[0]).trim();
-      if (num.startsWith('0')) {
-        num = '255' + num.substring(1);
-      } else if (num.startsWith('+')) {
-        num = num.substring(1);
-      }
-      formattedTo = num;
-    } else if (typeof to === 'string') {
-      let num = to.trim();
-      if (num.startsWith('0')) {
-        num = '255' + num.substring(1);
-      } else if (num.startsWith('+')) {
-        num = num.substring(1);
-      }
-      formattedTo = num;
+    let simu = Array.isArray(to) ? to[0] : to;
+    simu = String(simu).trim();
+    if (simu.startsWith('0')) {
+      simu = '255' + simu.substring(1);
     }
+    simu = simu.replace('+', '');
 
-    // Muundo sahihi na rahisi kabisa wa API ya Oasis
-    const oasisPayload = {
-      from: from,
-      to: formattedTo,
-      text: text
+    const payload = {
+      to: simu,
+      message: text,
+      sender: from || "AHC MKONONI"
     };
-
-    console.log("Sending to Oasis (Simple Payload):", targetUrl, oasisPayload);
 
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'Accept': 'application/json'
+        'Authorization': `Bearer ${apiKey}`
       },
-      body: JSON.stringify(oasisPayload)
+      body: JSON.stringify(payload)
     });
 
     const responseText = await response.text();
-    console.log("Oasis Response Status:", response.status);
-    console.log("Oasis Response Text:", responseText);
-
     let data;
     try {
       data = JSON.parse(responseText);
@@ -68,7 +51,6 @@ export default async function handler(req, res) {
 
     return res.status(response.status).json(data);
   } catch (error) {
-    console.error("Function Error:", error.message);
     return res.status(500).json({ error: error.message });
   }
 }
