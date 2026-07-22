@@ -313,14 +313,38 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
       let isSuccess = false;
       let responseDetails = "";
 
+          try {
+      const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+      
+      const resp = await fetch(publicProxyUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${oasisApiKey.trim()}`,
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const rawText = await resp.text();
+      let parsedJson: any = null;
       try {
-        let response: Response | null = null;
-        const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
-            const payload = {
-      from: sender,         // Badala ya sender_id
-      to: [recipientPhone], // Lazima iwe ndani ya array ya []
-      text: textToDeliver   // Badala ya message
-    };
+        parsedJson = JSON.parse(rawText);
+      } catch {}
+
+      if (resp.ok) {
+        isSuccess = true;
+        responseDetails = `Ujumbe umewasilishwa Oasis kwa mafanikio (${recipientPhone})`;
+      } else {
+        isSuccess = false;
+        responseDetails = `HTTP ${resp.status}: ${extractErrorMessage(parsedJson, rawText)}`;
+      }
+    } catch (err: unknown) {
+      isSuccess = false;
+      const errStr = err instanceof Error ? err.message : String(err);
+      responseDetails = `Hitilafu ya mtandao: ${errStr}`;
+    }
+
 
 
             try {
