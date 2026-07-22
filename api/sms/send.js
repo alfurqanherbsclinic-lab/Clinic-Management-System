@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
   try {
     const { apiKey, from, to, text, baseUrl } = req.body;
-    const targetUrl = baseUrl || 'https://api.oasistech.co.tz/v1/sms/send';
+    const base = baseUrl || 'https://api.oasistech.co.tz/v1/sms/send';
 
     let formattedTo = to;
     if (Array.isArray(to) && to.length > 0) {
@@ -23,32 +23,30 @@ export default async function handler(req, res) {
       if (num.startsWith('0')) {
         num = '255' + num.substring(1);
       }
-      formattedTo = [num];
+      formattedTo = num;
     } else if (typeof to === 'string') {
       let num = to.trim();
       if (num.startsWith('0')) {
         num = '255' + num.substring(1);
       }
-      formattedTo = [num];
+      formattedTo = num;
     }
 
-    // Muundo mahususi unaotumiwa na gateway nyingi za Oasis Bulk SMS
-    const oasisPayload = {
-      senderid: from,
-      number: formattedTo[0],
-      message: text
-    };
+    // Jaribu kutumia URLSearchParams (Form Urlencoded) ambayo mara nyingi hukubaliwa moja kwa moja na APIs za SMS
+    const params = new URLSearchParams();
+    params.append('source', from);
+    params.append('destination', formattedTo);
+    params.append('message', text);
 
-    console.log("Sending to Oasis (Standard Format):", targetUrl, oasisPayload);
+    const targetUrl = `${base}?${params.toString()}`;
+    console.log("Sending to Oasis (URL Encoded Get/Post):", targetUrl);
 
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
         'Accept': 'application/json'
-      },
-      body: JSON.stringify(oasisPayload)
+      }
     });
 
     const responseText = await response.text();
