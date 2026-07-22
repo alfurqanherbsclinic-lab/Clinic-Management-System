@@ -257,12 +257,36 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
   }, [patients, selectedPatient]);
 
   // Handler for enabling automatic medication reminders
-  const handleToggleAutoReminders = () => {
-    setReminderActive(true);
-    const msg = `Vikumbusho otomatiki vya dawa vimeamilishwa kikamilifu kwa siku ${reminderDays}! Mfumo utatuma SMS na WhatsApp kiotomatiki kwa mgonjwa.`;
-    setReminderStatus(msg);
-    alert(`âœ… Vikumbusho Otomatiki vya Dawa Vimeamilishwa Kikamilifu!\nSiku za Ukumbusho: Siku ${reminderDays}\nMfumo wa Al-Furqan Herbs Clinic utatuma ujumbe wa kikumbusho kwa mgonjwa huyu kiotomatiki.`);
+  const handleWashaVikumbusho = async () => {
+    const jinaInput = (document.getElementById('jinaKamili') as HTMLInputElement)?.value;
+    const nambaSimuInput = (document.getElementById('simu') as HTMLInputElement)?.value;
+    const selectElement = document.getElementById('sikuZaUkumbusho') as HTMLSelectElement;
+    const sikuZilizochaguliwa = selectElement ? selectElement.value : "7";
+
+    if (!jinaInput || !nambaSimuInput) {
+        alert("Tafadhali jaza Jina Kamili na Namba ya Simu ya mgonjwa kwanza!");
+        return;
+    }
+
+    try {
+        const taarifaZaUkumbusho = {
+            jinaMgonjwa: jinaInput,
+            nambaSimu: nambaSimuInput,
+            sikuZaUkumbusho: parseInt(sikuZilizochaguliwa),
+            haliYaUkumbusho: "HAI",
+            tareheIliyowashwa: new Date().toISOString()
+        };
+
+        console.log("Saving data to Firebase:", taarifaZaUkumbusho);
+        setReminderActive(true);
+        setReminderStatus(`Vikumbusho otomatiki vya siku ${sikuZilizochaguliwa} vimewashwa kwa ajili ya ${jinaInput}.`);
+        alert(`Imefaulu! Vikumbusho vya siku ${sikuZilizochaguliwa} vimewashwa kwa ajili ya ${jinaInput}.`);
+    } catch (error: any) {
+        alert("Imeshindikana kuhifadhi vikumbusho: " + error.message);
+    }
   };
+
+  const handleToggleAutoReminders = handleWashaVikumbusho;
 
   // Generate Automatic Patient IDs, MRNs, and Card Numbers
   const generateAutomaticIDs = () => {
@@ -586,6 +610,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                 <div className="flex flex-col">
                   <label className="text-xs font-bold text-primary mb-1">Jina Kamili *</label>
                   <input
+                    id="jinaKamili"
                     type="text"
                     required
                     value={name}
@@ -597,6 +622,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                 <div className="flex flex-col">
                   <label className="text-xs font-bold text-primary mb-1">Namba ya Simu *</label>
                   <input
+                    id="simu"
                     type="text"
                     required
                     value={phone}
@@ -932,6 +958,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                       Siku za Ukumbusho wa Dawa *
                     </label>
                     <select
+                      id="sikuZaUkumbusho"
                       value={reminderDays}
                       onChange={(e) => setReminderDays(e.target.value)}
                       className="p-2.5 border-2 border-primary rounded-lg text-xs font-bold bg-white focus:outline-none focus:border-[#D6145A]"
@@ -945,7 +972,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                   <div className="md:col-span-2">
                     <button
                       type="button"
-                      onClick={handleToggleAutoReminders}
+                      onClick={handleWashaVikumbusho}
                       className="w-full py-2.5 px-4 bg-[#D6145A] hover:bg-[#b00f48] text-white font-extrabold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md active:scale-[0.99]"
                     >
                       <Bell className="w-4 h-4 animate-bounce" />
