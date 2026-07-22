@@ -17,7 +17,6 @@ export default async function handler(req, res) {
     const { apiKey, from, to, text, baseUrl } = req.body;
     const targetUrl = baseUrl || 'https://api.oasistech.co.tz/v1/sms/send';
 
-    // Hakikisha namba ya simu imesafishwa na kuwa katika mfumo wa 255...
     let formattedTo = to;
     if (Array.isArray(to) && to.length > 0) {
       let num = String(to[0]).trim();
@@ -42,6 +41,8 @@ export default async function handler(req, res) {
       text: text
     };
 
+    console.log("Sending to Oasis:", targetUrl, oasisPayload);
+
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
@@ -53,6 +54,9 @@ export default async function handler(req, res) {
     });
 
     const responseText = await response.text();
+    console.log("Oasis Response Status:", response.status);
+    console.log("Oasis Response Text:", responseText);
+
     let data;
     try {
       data = JSON.parse(responseText);
@@ -62,6 +66,7 @@ export default async function handler(req, res) {
 
     return res.status(response.status).json(data);
   } catch (error) {
+    console.error("Function Error:", error.message);
     return res.status(500).json({ error: error.message });
   }
 }
