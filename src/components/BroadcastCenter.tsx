@@ -41,7 +41,8 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     return localStorage.getItem("oasis_api_key") || "";
   });
   const [oasisSenderId, setOasisSenderId] = useState<string>(() => {
-    return localStorage.getItem("oasis_sender_id") || "ALFURQAN";
+    const saved = localStorage.getItem("oasis_sender_id");
+    return (!saved || saved === "ALFURQAN") ? "AHC MKONONI" : saved;
   });
   const [oasisBaseUrl, setOasisBaseUrl] = useState<string>(() => {
     return localStorage.getItem("oasis_base_url") || "https://api.oasistech.co.tz/v1/sms/send";
@@ -220,7 +221,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     setSuccessMessage(null);
 
     const hasApiKey = oasisApiKey.trim().length > 0;
-    const sender = oasisSenderId.trim() || "ALFURQAN";
+    const sender = oasisSenderId.trim() || "AHC MKONONI";
 
     const logs: { name: string; phone: string; status: "success" | "failed"; time: string; details?: string }[] = [];
 
@@ -625,7 +626,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
                 >
                   {patients.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} ({p.cardNumber}) — Simu: {p.phone}
+                      {p.name} ({p.cardNumber}) â€” Simu: {p.phone}
                     </option>
                   ))}
                 </select>
@@ -690,7 +691,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
                 </p>
                 <div className="mt-2 flex items-center justify-between text-[10px] font-bold">
                   <span className={oasisApiKey ? "text-emerald-700" : "text-amber-700"}>
-                    {oasisApiKey ? "✓ API Key ipo tayari" : "⚠ API Key haijawekwa (Demo Mode)"}
+                    {oasisApiKey ? "âœ“ API Key ipo tayari" : "âš  API Key haijawekwa (Demo Mode)"}
                   </span>
                   <span className="text-gray-500 font-mono">Sender: {oasisSenderId}</span>
                 </div>
@@ -719,7 +720,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
                   Bure kabisa via <code className="text-emerald-700 font-bold">wa.me</code> link. Inafungua WhatsApp moja kwa moja.
                 </p>
                 <div className="mt-2 flex items-center justify-between text-[10px] font-bold text-emerald-700">
-                  <span>✓ Hakuna gharama za Meta</span>
+                  <span>âœ“ Hakuna gharama za Meta</span>
                   <span>Direct Web/App</span>
                 </div>
               </button>
@@ -855,7 +856,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
                       >
                         <div>
                           <p className="font-extrabold text-primary uppercase">{p.name}</p>
-                          <p className="text-[10px] text-gray-500 font-mono">{p.phone} • {p.cardNumber}</p>
+                          <p className="text-[10px] text-gray-500 font-mono">{p.phone} â€¢ {p.cardNumber}</p>
                         </div>
                         <button
                           type="button"
@@ -935,11 +936,11 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
               <div className="flex justify-between font-bold text-gray-700">
                 <span>Oasis Sender ID:</span>
                 <span className="font-mono text-primary uppercase">{oasisSenderId}</span>
-              </div>⁸
+              </div>
               <div className="flex justify-between font-bold text-gray-700">
                 <span>API Key Token:</span>
                 <span className="font-mono text-gray-500">
-                  {oasisApiKey ? "••••••••" + oasisApiKey.slice(-4) : "Haijawekwa"}
+                  {oasisApiKey ? "â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" + oasisApiKey.slice(-4) : "Haijawekwa"}
                 </span>
               </div>
             </div>
@@ -969,10 +970,10 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
                   <div key={idx} className="p-2 bg-slate-50 rounded border border-slate-200 flex items-center justify-between">
                     <div>
                       <p className="font-bold text-primary">{log.name}</p>
-                      <p className="text-[9px] text-gray-400 font-mono">{log.phone} • {log.time}</p>
+                      <p className="text-[9px] text-gray-400 font-mono">{log.phone} â€¢ {log.time}</p>
                     </div>
                     <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                      ✓ Sent
+                      âœ“ Sent
                     </span>
                   </div>
                 ))}
