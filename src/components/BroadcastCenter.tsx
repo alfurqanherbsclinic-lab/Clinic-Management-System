@@ -332,12 +332,18 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
                 "Content-Type": "application/json",
                 "Accept": "application/json"
               },
-                    body: JSON.stringify({
-        from: sender,          // Ilikuwa sender_id
-        to: [testPhone],       // Lazima iwe ndani ya array ya []
-        message: undefined,    // Ondoa field ya message
-        text: "Jaribio la muunganiko wa mfumo wa Al-Furqan Herbs Clinic na Oasis SMS Gateway." // Badala ya message weka text
-      })
+                              body: JSON.stringify({
+            apiKey: oasisApiKey.trim(),
+            from: sender,
+            to: [testPhone],
+            text: "Jaribio la muunganiko wa mfumo wa Al-Furqan Herbs Clinic na Oasis SMS Gateway.",
+            baseUrl: targetUrl
+          })
+        }); // <--- Hakikisha hapa kuna mabano haya mawili ya kufunga (})
+
+        if (proxyResp.status !== 404 && proxyResp.status !== 405) {
+          response = proxyResp;
+        }
 
 
             if (proxyResp.status !== 404 && proxyResp.status !== 405) {
