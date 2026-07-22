@@ -36,20 +36,14 @@ export default async function handler(req, res) {
       formattedTo = num;
     }
 
-    // Muundo wa moja kwa moja unaokubaliwa na mifumo mingi ya ndani ya gateway
+    // Muundo sahihi na rahisi kabisa wa API ya Oasis
     const oasisPayload = {
-      source_addr: from,
-      schedule_time: "",
-      messages: [
-        {
-          dest_addr: formattedTo,
-          message_id: 1,
-          text: text
-        }
-      ]
+      from: from,
+      to: formattedTo,
+      text: text
     };
 
-    console.log("Sending to Oasis (Messages Array):", targetUrl, oasisPayload);
+    console.log("Sending to Oasis (Simple Payload):", targetUrl, oasisPayload);
 
     const response = await fetch(targetUrl, {
       method: 'POST',
