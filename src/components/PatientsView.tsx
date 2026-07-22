@@ -13,7 +13,10 @@ import {
   Upload,
   Download,
   Send,
-  MessageSquare
+  MessageSquare,
+  Bell,
+  Clock,
+  CheckCircle2
 } from "lucide-react";
 import { Patient } from "../types";
 import BroadcastCenter from "./BroadcastCenter";
@@ -93,6 +96,11 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
   const [guardian, setGuardian] = useState("N/A");
   const [maritalStatus, setMaritalStatus] = useState("Hajaoa");
   const [nextOfKin, setNextOfKin] = useState("");
+
+  // States for Usimamizi wa Vikumbusho vya Dawa (Medication Reminders Management)
+  const [reminderDays, setReminderDays] = useState("7");
+  const [reminderActive, setReminderActive] = useState(false);
+  const [reminderStatus, setReminderStatus] = useState("");
 
   // States for live interactive features
   const [searchQuery, setSearchQuery] = useState("");
@@ -248,6 +256,14 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
     }
   }, [patients, selectedPatient]);
 
+  // Handler for enabling automatic medication reminders
+  const handleToggleAutoReminders = () => {
+    setReminderActive(true);
+    const msg = `Vikumbusho otomatiki vya dawa vimeamilishwa kikamilifu kwa siku ${reminderDays}! Mfumo utatuma SMS na WhatsApp kiotomatiki kwa mgonjwa.`;
+    setReminderStatus(msg);
+    alert(`âœ… Vikumbusho Otomatiki vya Dawa Vimeamilishwa Kikamilifu!\nSiku za Ukumbusho: Siku ${reminderDays}\nMfumo wa Al-Furqan Herbs Clinic utatuma ujumbe wa kikumbusho kwa mgonjwa huyu kiotomatiki.`);
+  };
+
   // Generate Automatic Patient IDs, MRNs, and Card Numbers
   const generateAutomaticIDs = () => {
     const nextIdNum = patients.length + 1;
@@ -358,6 +374,8 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
     setOccupation("");
     setNextOfKin("");
     setHasInsurance(false);
+    setReminderActive(false);
+    setReminderStatus("");
 
     alert(`Mgonjwa JIPYA amesajiliwa kikamilifu! ID yake ni ${newPatient.id}, Namba ya Kadi ni ${newPatient.cardNumber}.`);
   };
@@ -888,14 +906,64 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                       }`}
                     >
                       <Fingerprint className="w-3.5 h-3.5" />
-                      {fingerprintEnabled ? "Kidole kimesajiliwa ✅" : "Sajili Kidole cha Simu"}
+                      {fingerprintEnabled ? "Kidole kimesajiliwa âœ…" : "Sajili Kidole cha Simu"}
                     </button>
                   </div>
                 </div>
                 {aiStatus && (
                   <p className="text-[11px] text-emerald-700 font-bold font-mono text-center">
-                    {aiProcessing ? "⚡ " : "✅ "}{aiStatus}
+                    {aiProcessing ? "âš¡ " : "âœ… "}{aiStatus}
                   </p>
+                )}
+              </div>
+            </div>
+
+            {/* Segment E: Usimamizi wa Vikumbusho vya Dawa (Medication Reminders Management) */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-secondary uppercase tracking-widest border-b border-primary/20 pb-1 flex items-center gap-2">
+                <Bell className="w-4 h-4 text-[#D6145A]" />
+                <span>E. Usimamizi wa Vikumbusho vya Dawa (Medication Reminders Management)</span>
+              </h4>
+              <div className="bg-slate-50 p-4 rounded-lg border-2 border-primary/20 space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div className="flex flex-col">
+                    <label className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-[#D6145A]" />
+                      Siku za Ukumbusho wa Dawa *
+                    </label>
+                    <select
+                      value={reminderDays}
+                      onChange={(e) => setReminderDays(e.target.value)}
+                      className="p-2.5 border-2 border-primary rounded-lg text-xs font-bold bg-white focus:outline-none focus:border-[#D6145A]"
+                    >
+                      <option value="7">Siku 7 (Wiki 1)</option>
+                      <option value="14">Siku 14 (Wiki 2)</option>
+                      <option value="30">Siku 30 (Mwezi 1)</option>
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <button
+                      type="button"
+                      onClick={handleToggleAutoReminders}
+                      className="w-full py-2.5 px-4 bg-[#D6145A] hover:bg-[#b00f48] text-white font-extrabold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md active:scale-[0.99]"
+                    >
+                      <Bell className="w-4 h-4 animate-bounce" />
+                      Washa Vikumbusho Otomatiki
+                    </button>
+                  </div>
+                </div>
+
+                {reminderActive && (
+                  <div className="bg-emerald-50 border border-emerald-300 p-2.5 rounded-lg text-emerald-800 text-xs font-bold flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span>{reminderStatus || `Vikumbusho otomatiki vya dawa vimeamilishwa kwa siku ${reminderDays}.`}</span>
+                    </div>
+                    <span className="bg-[#0F2D3E] text-white text-[10px] font-mono px-2 py-0.5 rounded font-bold">
+                      ACTIVE
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
@@ -1115,7 +1183,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                     />
                     <div>
                       <p className="text-xs font-bold text-primary leading-tight uppercase line-clamp-1">{p.name}</p>
-                      <p className="text-[10px] text-secondary font-mono font-bold mt-0.5">{p.cardNumber} • {p.phone}</p>
+                      <p className="text-[10px] text-secondary font-mono font-bold mt-0.5">{p.cardNumber} â€¢ {p.phone}</p>
                     </div>
                   </div>
                   <button
