@@ -331,14 +331,13 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
                 "Content-Type": "application/json",
                 "Accept": "application/json"
               },
-              body: JSON.stringify({
-                apiKey: oasisApiKey.trim(),
-                sender_id: sender,
-                recipient: recipientPhone,
-                message: textToDeliver,
-                baseUrl: targetUrl
-              })
-            });
+                    body: JSON.stringify({
+        from: sender,          // Ilikuwa sender_id
+        to: [testPhone],       // Lazima iwe ndani ya array ya []
+        message: undefined,    // Ondoa field ya message
+        text: "Jaribio la muunganiko wa mfumo wa Al-Furqan Herbs Clinic na Oasis SMS Gateway." // Badala ya message weka text
+      })
+
 
             if (proxyResp.status !== 404 && proxyResp.status !== 405) {
               response = proxyResp;
