@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Menu, 
   Bell, 
@@ -24,6 +24,7 @@ import {
   ChevronRight,
   FileText,
   Clock,
+  Calendar,
   MessageSquare,
   AlertCircle
 } from "lucide-react";
@@ -152,9 +153,26 @@ export default function App() {
   const [currentRole, setCurrentRole] = useState("Msimamizi Mkuu");
   const [loginAttempts, setLoginAttempts] = useState(0);
 
-  // Active navigation view state
-  const [activeView, setActiveView] = useState<ActiveView>("dashboard");
+  // Active navigation view state - defaults to Patients & Card view (Original Dashboard Layout)
+  const [activeView, setActiveView] = useState<ActiveView>("patients");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Live real-time clock & date for header
+  const [currentTime, setCurrentTime] = useState<string>(() => new Date().toLocaleTimeString());
+  const [currentDate, setCurrentDate] = useState<string>(() => {
+    try {
+      return new Date().toLocaleDateString("sw-TZ", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    } catch {
+      return new Date().toDateString();
+    }
+  });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const [patients, setPatients] = useState<Patient[]>(INITIAL_PATIENTS);
   const [notifications, setNotifications] = useState<string[]>([
@@ -218,100 +236,38 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans relative">
       
-      {/* Top Header */}
-      <header className="bg-white border-b-2 border-primary/10 sticky top-0 z-40 px-4 sm:px-6 py-3.5 flex items-center justify-between shadow-sm">
+      {/* Top Header matching original clean dashboard */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 px-4 sm:px-6 py-3 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-3">
           <button 
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2.5 hover:bg-slate-100 rounded-xl text-primary transition-all cursor-pointer border border-slate-200"
+            className="p-2 hover:bg-slate-100 rounded-xl text-primary transition-all cursor-pointer border border-slate-200"
             title="Fungua Orodha (Menu)"
           >
             <Menu className="w-5 h-5" />
           </button>
           <div>
             <h1 className="text-base sm:text-lg font-black font-display text-primary tracking-wide uppercase flex items-center gap-2">
-              <span>AL-FURQAN HERB'S CLINIC</span>
-              <span className="hidden md:inline-block px-2 py-0.5 text-[10px] bg-emerald-100 text-emerald-800 rounded-full font-sans tracking-normal font-bold">
-                SYSTEM ONLINE
-              </span>
+              <span>USAJILI WA WAGONJWA</span>
             </h1>
             <p className="text-[10px] text-gray-500 font-bold tracking-wider uppercase">
-              HOSPITAL INFORMATION SYSTEM â€¢ DR. KHALIFA REHANI
+              AL-FURQAN CLINIC â€¢ CLINIC MANAGEMENT SYSTEM
             </p>
           </div>
         </div>
 
-        {/* Desktop Navigation Tabs */}
-        <nav className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
-          <button
-            onClick={() => setActiveView("dashboard")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeView === "dashboard"
-                ? "bg-primary text-white shadow-sm"
-                : "text-slate-600 hover:bg-white hover:text-primary"
-            }`}
-          >
-            <LayoutDashboard className="w-3.5 h-3.5" />
-            Dashboard
-          </button>
-          <button
-            onClick={() => setActiveView("patients")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeView === "patients"
-                ? "bg-primary text-white shadow-sm"
-                : "text-slate-600 hover:bg-white hover:text-primary"
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            Wagonjwa & Kadi
-          </button>
-          <button
-            onClick={() => setActiveView("broadcast")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeView === "broadcast"
-                ? "bg-rose-600 text-white shadow-sm"
-                : "text-slate-600 hover:bg-white hover:text-rose-600"
-            }`}
-          >
-            <Send className="w-3.5 h-3.5" />
-            SMS Broadcast
-          </button>
-          <button
-            onClick={() => setActiveView("consultation")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeView === "consultation"
-                ? "bg-primary text-white shadow-sm"
-                : "text-slate-600 hover:bg-white hover:text-primary"
-            }`}
-          >
-            <Stethoscope className="w-3.5 h-3.5" />
-            Daktari
-          </button>
-          <button
-            onClick={() => setActiveView("pharmacy")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeView === "pharmacy"
-                ? "bg-primary text-white shadow-sm"
-                : "text-slate-600 hover:bg-white hover:text-primary"
-            }`}
-          >
-            <Pill className="w-3.5 h-3.5" />
-            Pharmacy
-          </button>
-          <button
-            onClick={() => setActiveView("settings")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeView === "settings"
-                ? "bg-primary text-white shadow-sm"
-                : "text-slate-600 hover:bg-white hover:text-primary"
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5" />
-            Mipangilio
-          </button>
-        </nav>
-
+        {/* Realtime Clock & Date Pills + Notification + Logout */}
         <div className="flex items-center gap-2.5">
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-xl border border-slate-200 text-xs font-mono font-bold text-primary shadow-2xs">
+            <Clock className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
+            <span>{currentTime}</span>
+          </div>
+
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 shadow-2xs">
+            <Calendar className="w-3.5 h-3.5 text-primary" />
+            <span>{currentDate}</span>
+          </div>
+
           <button 
             onClick={() => {
               setShowNotificationCount(false);
@@ -320,24 +276,85 @@ export default function App() {
             className="p-2 bg-slate-100 hover:bg-slate-200 text-primary rounded-xl relative transition-all cursor-pointer border border-slate-200"
             title="Taarifa"
           >
-            <Bell className="w-5 h-5" />
+            <Bell className="w-4 h-4" />
             {showNotificationCount && notifications.length > 0 && (
               <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border border-white animate-bounce" />
             )}
           </button>
           
-          <div className="h-7 w-px bg-slate-200 hidden sm:block" />
+          <div className="h-6 w-px bg-slate-200 hidden sm:block" />
 
           <button 
             onClick={handleLogout}
-            className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 border border-rose-200"
+            className="px-3 py-1.5 bg-rose-60 hover:bg-rose-100 text-rose-600 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 border border-rose-200 text-xs font-bold shadow-2xs"
             title="Toka (Logout)"
           >
             <LogOut className="w-4 h-4" />
-            <span className="text-xs font-bold hidden sm:inline">Logout</span>
+            <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
       </header>
+
+      {/* Main 2-Tab Navigation Bar (USAJILI WA WAGONJWA & KADI | SMS & WHATSAPP BROADCAST CENTER) */}
+      <div className="bg-white border-b-2 border-primary/10 px-4 sm:px-6 py-2 shadow-2xs">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 overflow-x-auto no-scrollbar">
+          <nav className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveView("patients")}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
+                activeView === "patients"
+                  ? "bg-primary text-white shadow-md"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>USAJILI WA WAGONJWA & KADI</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                activeView === "patients" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"
+              }`}>
+                Wagonjwa Waliosajiliwa: {patients.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveView("broadcast")}
+              className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
+                activeView === "broadcast"
+                  ? "bg-rose-600 text-white shadow-md"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-rose-600"
+              }`}
+            >
+              <Send className="w-4 h-4" />
+              <span>SMS & WHATSAPP BROADCAST CENTER</span>
+              <span className="px-2 py-0.5 bg-rose-100 text-rose-800 text-[10px] font-black rounded-full uppercase">
+                OASIS & WA
+              </span>
+            </button>
+          </nav>
+
+          {/* Quick Doctor / Pharmacy Links */}
+          <div className="hidden lg:flex items-center gap-2">
+            <button
+              onClick={() => setActiveView("consultation")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeView === "consultation" ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <Stethoscope className="w-3.5 h-3.5" />
+              Daktari
+            </button>
+            <button
+              onClick={() => setActiveView("pharmacy")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeView === "pharmacy" ? "bg-amber-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              <Pill className="w-3.5 h-3.5" />
+              Pharmacy
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Sidebar Drawer Navigation */}
       {sidebarOpen && (
