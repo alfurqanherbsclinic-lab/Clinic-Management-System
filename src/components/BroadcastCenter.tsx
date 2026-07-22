@@ -225,19 +225,19 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     const sender = oasisSenderId.trim() || "AHC MKONONI";
     const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
 
-    try {
-      const resp = await fetch("/api/sms/send", {
+        try {
+      const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+      const resp = await fetch(publicProxyUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${oasisApiKey.trim()}`,
           "Accept": "application/json"
         },
         body: JSON.stringify({
-          apiKey: oasisApiKey.trim(),
-          sender_id: sender,
-          recipient: testPhone,
-          message: "Jaribio la muunganiko wa mfumo wa Al-Furqan Herbs Clinic na Oasis SMS Gateway.",
-          baseUrl: targetUrl
+          from: sender,
+          to: [testPhone],
+          text: "Jaribio la muunganiko wa mfumo wa Al-Furqan Herbs Clinic na Oasis SMS Gateway."
         })
       });
 
