@@ -323,67 +323,24 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     };
 
 
-        if (useCorsProxy) {
-          // Attempt 1: Try local server proxy (/api/sms/send)
-          try {
-            const proxyResp = await fetch("/api/sms/send", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-              },
-                              body: JSON.stringify({
-            apiKey: oasisApiKey.trim(),
-            from: sender,
-            to: [testPhone],
-            text: "Jaribio la muunganiko wa mfumo wa Al-Furqan Herbs Clinic na Oasis SMS Gateway.",
-            baseUrl: targetUrl
-          })
-        }); // <--- Hakikisha hapa kuna mabano haya mawili ya kufunga (})
-
-        if (proxyResp.status !== 404 && proxyResp.status !== 405) {
-          response = proxyResp;
-        }
-
-
-            if (proxyResp.status !== 404 && proxyResp.status !== 405) {
-              response = proxyResp;
-            }
-          } catch (pErr) {
-            // Local proxy endpoint not available
-          }
-
-          // Attempt 2: If local server proxy missing (e.g. static hosting on Vercel), try Public CORS proxy
-          if (!response) {
             try {
-              const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-              response = await fetch(publicProxyUrl, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${oasisApiKey.trim()}`,
-                  "Accept": "application/json"
-                },
-                body: JSON.stringify(payload)
-              });
-            } catch (pubErr) {
-              // Public proxy failed, will try direct fetch
-            }
-          }
-        }
+      const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+      
+      response = await fetch(publicProxyUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${oasisApiKey.trim()}`,
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    } catch (proxyErr) {
+      isSuccess = false;
+      responseDetails = `Hitilafu ya mtandao: ${proxyErr.message}`;
+      return;
+    }
 
-        // Attempt 3: Direct fetch fallback if no proxy response was received
-        if (!response) {
-          response = await fetch(targetUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${oasisApiKey.trim()}`,
-              "Accept": "application/json"
-            },
-            body: JSON.stringify(payload)
-          });
-        }
 
         if (response.ok) {
           const data = await response.json().catch(() => ({}));
