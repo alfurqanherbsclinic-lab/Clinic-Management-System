@@ -347,10 +347,10 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
 
 
-            try {
+                try {
       const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
       
-      response = await fetch(publicProxyUrl, {
+      const resp = await fetch(publicProxyUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -359,44 +359,26 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
         },
         body: JSON.stringify(payload)
       });
-    } catch (proxyErr) {
+
+      const rawText = await resp.text();
+      let parsedJson: any = null;
+      try {
+        parsedJson = JSON.parse(rawText);
+      } catch {}
+
+      if (resp.ok) {
+        isSuccess = true;
+        responseDetails = `Ujumbe umewasilishwa Oasis kwa mafanikio (${recipientPhone})`;
+      } else {
+        isSuccess = false;
+        responseDetails = `HTTP ${resp.status}: ${extractErrorMessage(parsedJson, rawText)}`;
+      }
+    } catch (err: unknown) {
       isSuccess = false;
-      responseDetails = `Hitilafu ya mtandao: ${proxyErr.message}`;
-      return;
+      const errStr = err instanceof Error ? err.message : String(err);
+      responseDetails = `Hitilafu ya mtandao: ${errStr}`;
     }
 
-
-        if (response.ok) {
-          const data = await response.json().catch(() => ({}));
-          isSuccess = true;
-          const msg = extractErrorMessage(data, `Ujumbe umewasilishwa Oasis kwa mafanikio (${recipientPhone})`);
-          responseDetails = `HTTP ${response.status}: ${msg}`;
-        } else {
-          let errData: any = {};
-          const contentType = response.headers.get("content-type") || "";
-          if (contentType.includes("application/json")) {
-            errData = await response.json().catch(() => ({}));
-          } else {
-            const txt = await response.text().catch(() => "");
-            errData = txt;
-          }
-
-          const cleanMsg = extractErrorMessage(errData, `HTTP ${response.status} kutoka Oasis Gateway`);
-          isSuccess = false;
-          responseDetails = `Hitilafu ya Oasis (HTTP ${response.status}): ${cleanMsg}`;
-        }
-      } catch (err: unknown) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        const isCorsError = errMsg.toLowerCase().includes("failed to fetch") || errMsg.toLowerCase().includes("networkerror");
-        
-        if (isCorsError) {
-          isSuccess = false;
-          responseDetails = `Kizuizi cha Kivinjari (CORS Error): Server ya Oasis inakataa maombi ya moja kwa moja. Mfumo unatumia Server Proxy kurekebisha hili.`;
-        } else {
-          isSuccess = false;
-          responseDetails = `Hitilafu ya Mtandao: ${errMsg}`;
-        }
-      }
 
       const logItem = {
         name: patient.name,
