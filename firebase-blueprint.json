@@ -1,0 +1,32 @@
+{
+  "entities": {
+    "reminders": {
+      "title": "Reminders",
+      "description": "Medication reminders for clinic patients",
+      "properties": {
+        "jinaMgonjwa": {
+          "type": "string"
+        },
+        "nambaSimu": {
+          "type": "string"
+        },
+        "sikuZaUkumbusho": {
+          "type": "number"
+        },
+        "haliYaUkumbusho": {
+          "type": "string"
+        },
+        "tareheIliyowashwa": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "jinaMgonjwa",
+        "nambaSimu",
+        "sikuZaUkumbusho",
+        "haliYaUkumbusho",
+        "tareheIliyowashwa"
+      ]
+    }
+  }
+}
