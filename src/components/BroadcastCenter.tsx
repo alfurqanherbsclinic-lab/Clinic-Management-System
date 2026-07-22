@@ -347,7 +347,9 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
 
 
-                try {
+                    const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
+    
+    try {
       const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
       
       const resp = await fetch(publicProxyUrl, {
@@ -378,6 +380,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
       const errStr = err instanceof Error ? err.message : String(err);
       responseDetails = `Hitilafu ya mtandao: ${errStr}`;
     }
+
 
 
       const logItem = {
