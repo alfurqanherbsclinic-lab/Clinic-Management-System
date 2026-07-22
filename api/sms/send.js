@@ -32,16 +32,14 @@ export default async function handler(req, res) {
       formattedTo = [num];
     }
 
+    // Muundo mahususi unaotumiwa na gateway nyingi za Oasis Bulk SMS
     const oasisPayload = {
-      sender_id: from,
-      from: from,
-      recipient: formattedTo[0],
-      to: formattedTo,
-      message: text,
-      text: text
+      senderid: from,
+      number: formattedTo[0],
+      message: text
     };
 
-    console.log("Sending to Oasis:", targetUrl, oasisPayload);
+    console.log("Sending to Oasis (Standard Format):", targetUrl, oasisPayload);
 
     const response = await fetch(targetUrl, {
       method: 'POST',
