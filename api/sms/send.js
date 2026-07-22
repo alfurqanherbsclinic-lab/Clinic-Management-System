@@ -17,12 +17,27 @@ export default async function handler(req, res) {
     const { apiKey, from, to, text, baseUrl } = req.body;
     const targetUrl = baseUrl || 'https://api.oasistech.co.tz/v1/sms/send';
 
-    // Tunatuma vigezo vyote viwili (from na sender_id) ili Oasis ikubali moja kwa moja
+    // Hakikisha namba ya simu imesafishwa na kuwa katika mfumo wa 255...
+    let formattedTo = to;
+    if (Array.isArray(to) && to.length > 0) {
+      let num = String(to[0]).trim();
+      if (num.startsWith('0')) {
+        num = '255' + num.substring(1);
+      }
+      formattedTo = [num];
+    } else if (typeof to === 'string') {
+      let num = to.trim();
+      if (num.startsWith('0')) {
+        num = '255' + num.substring(1);
+      }
+      formattedTo = [num];
+    }
+
     const oasisPayload = {
       sender_id: from,
       from: from,
-      recipient: Array.isArray(to) ? to[0] : to,
-      to: to,
+      recipient: formattedTo[0],
+      to: formattedTo,
       message: text,
       text: text
     };
