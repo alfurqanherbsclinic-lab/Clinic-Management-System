@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { Patient } from "../types";
 import BroadcastCenter from "./BroadcastCenter";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, doc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 interface PatientAvatarProps {
@@ -351,12 +351,30 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
 
         console.log("Saving medication reminders to Firebase:", taarifaZaUkumbusho);
         
-        // Hifadhi moja kwa moja kwenye Firebase Firestore Database
-        await addDoc(collection(db, "patient_reminders"), taarifaZaUkumbusho);
+        // Angalia kama kuna ratiba iliyopo ya namba hii ya simu ili tusitengeneze duplicates
+        const qPhone = query(
+          collection(db, "patient_reminders"),
+          where("nambaSimu", "==", nambaSimuInput)
+        );
+        const existingPhoneDocs = await getDocs(qPhone);
+
+        if (!existingPhoneDocs.empty) {
+          const mainDocId = existingPhoneDocs.docs[0].id;
+          await setDoc(doc(db, "patient_reminders", mainDocId), taarifaZaUkumbusho, { merge: true });
+          
+          // Zima au badilisha hali ya ratiba za zamani ikiwa zipo duplicate
+          for (let i = 1; i < existingPhoneDocs.docs.length; i++) {
+            await updateDoc(doc(db, "patient_reminders", existingPhoneDocs.docs[i].id), {
+              haliYaUkumbusho: "IMESITISHWA"
+            });
+          }
+        } else {
+          await addDoc(collection(db, "patient_reminders"), taarifaZaUkumbusho);
+        }
 
         setReminderActive(true);
         setReminderStatus(`Vikumbusho otomatiki vya siku ${reminderDays} (Hadi ${medicationEndDate}) vimewashwa na kuhifadhiwa kwa ajili ya ${jinaInput} (${medicationName}).`);
-        alert(`Imefaulu! Vikumbusho vya siku ${reminderDays} vimewashwa na kuhifadhiwa kikamilifu kwenye Firebase Database kwa ajili ya ${jinaInput}.\n\n💊 Dawa: ${medicationName}\n🔄 Mzunguko: ${medicationFrequency}\n📅 Tarehe ya Kuanza: ${medicationStartDate}\n🏁 Tarehe ya Kumaliza: ${medicationEndDate}`);
+        alert(`Imefaulu! Vikumbusho vya siku ${reminderDays} vimewashwa na kuhifadhiwa kikamilifu kwenye Firebase Database kwa ajili ya ${jinaInput}.\n\nðŸ’Š Dawa: ${medicationName}\nðŸ”„ Mzunguko: ${medicationFrequency}\nðŸ“… Tarehe ya Kuanza: ${medicationStartDate}\nðŸ Tarehe ya Kumaliza: ${medicationEndDate}`);
     } catch (error: any) {
         console.error("Firebase save error:", error);
         alert("Imeshindikana kuhifadhi vikumbusho kwenye Firebase: " + error.message);
@@ -699,7 +717,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
               {patients && patients.length > 0 && (
                 <div className="bg-indigo-50/80 p-3 rounded-lg border-2 border-indigo-200">
                   <label className="text-xs font-bold text-indigo-950 block mb-1 flex items-center justify-between">
-                    <span>📋 Au Chagua Mgonjwa Aliyepo Kwenye Mfumo (Auto-fill Taarifa Zote & Simu):</span>
+                    <span>ðŸ“‹ Au Chagua Mgonjwa Aliyepo Kwenye Mfumo (Auto-fill Taarifa Zote & Simu):</span>
                     <span className="text-[10px] text-indigo-700 font-mono font-bold">{patients.length} Wagonjwa</span>
                   </label>
                   <select
@@ -710,7 +728,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                     <option value="">-- Bonyeza Hapa Kuchagua Mgonjwa Aliyesajiliwa --</option>
                     {patients.map((p) => (
                       <option key={p.id} value={p.id}>
-                        👤 {p.name.toUpperCase()} | 📱 {p.phone} | 💳 {p.cardNumber} ({p.age} Yrs)
+                        ðŸ‘¤ {p.name.toUpperCase()} | ðŸ“± {p.phone} | ðŸ’³ {p.cardNumber} ({p.age} Yrs)
                       </option>
                     ))}
                   </select>
@@ -1043,13 +1061,13 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                       }`}
                     >
                       <Fingerprint className="w-3.5 h-3.5" />
-                      {fingerprintEnabled ? "Kidole kimesajiliwa ✅" : "Sajili Kidole cha Simu"}
+                      {fingerprintEnabled ? "Kidole kimesajiliwa âœ…" : "Sajili Kidole cha Simu"}
                     </button>
                   </div>
                 </div>
                 {aiStatus && (
                   <p className="text-[11px] text-emerald-700 font-bold font-mono text-center">
-                    {aiProcessing ? "⚡ " : "✅ "}{aiStatus}
+                    {aiProcessing ? "âš¡ " : "âœ… "}{aiStatus}
                   </p>
                 )}
               </div>
@@ -1073,7 +1091,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                 {patients && patients.length > 0 && (
                   <div className="bg-white p-3 rounded-lg border-2 border-rose-300 shadow-2xs space-y-1">
                     <label className="text-xs font-bold text-primary flex items-center justify-between">
-                      <span>📋 Chagua Mgonjwa Aliyepo (Auto-fill Jina na Namba ya Simu):</span>
+                      <span>ðŸ“‹ Chagua Mgonjwa Aliyepo (Auto-fill Jina na Namba ya Simu):</span>
                       <span className="text-[10px] text-rose-700 bg-rose-50 px-2 py-0.5 rounded font-mono font-bold">
                         {patients.length} Wagonjwa
                       </span>
@@ -1086,7 +1104,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                       <option value="">-- Bonyeza Hapa Kuteua Mgonjwa Kutoka Orodha --</option>
                       {patients.map((p) => (
                         <option key={p.id} value={p.id}>
-                          👤 {p.name.toUpperCase()} | 📱 {p.phone} | 💳 {p.cardNumber}
+                          ðŸ‘¤ {p.name.toUpperCase()} | ðŸ“± {p.phone} | ðŸ’³ {p.cardNumber}
                         </option>
                       ))}
                     </select>
@@ -1097,7 +1115,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-primary/10 shadow-2xs">
                   <div>
                     <label className="text-[11px] font-bold text-gray-600 block mb-1">
-                      👤 Jina la Mgonjwa:
+                      ðŸ‘¤ Jina la Mgonjwa:
                     </label>
                     <div className="p-2 bg-gray-50 border border-gray-300 rounded font-bold text-xs text-primary truncate">
                       {name.trim() ? name.toUpperCase() : "(Jaza Jina Kamili hapo juu A)"}
@@ -1105,7 +1123,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                   </div>
                   <div>
                     <label className="text-[11px] font-bold text-gray-600 block mb-1">
-                      📱 Namba ya Simu ya Ukumbusho:
+                      ðŸ“± Namba ya Simu ya Ukumbusho:
                     </label>
                     <div className="p-2 bg-gray-50 border border-gray-300 rounded font-bold text-xs text-primary truncate">
                       {phone.trim() ? phone : "(Jaza Simu hapo juu A)"}
@@ -1117,7 +1135,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex flex-col">
                     <label className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
-                      💊 Dawa Alizopewa (Prescribed Medication) *
+                      ðŸ’Š Dawa Alizopewa (Prescribed Medication) *
                     </label>
                     <input
                       type="text"
@@ -1131,7 +1149,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
 
                   <div className="flex flex-col">
                     <label className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
-                      🔄 Mara ngapi atumie dawa? (Frequency) *
+                      ðŸ”„ Mara ngapi atumie dawa? (Frequency) *
                     </label>
                     <select
                       value={medicationFrequency}
@@ -1150,7 +1168,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="flex flex-col">
                     <label className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
-                      ⏰ Muda wa Kuanza Kutumia
+                      â° Muda wa Kuanza Kutumia
                     </label>
                     <select
                       value={medicationStartTime}
@@ -1185,7 +1203,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
 
                   <div className="flex flex-col">
                     <label className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
-                      📅 Tarehe ya Kuanza
+                      ðŸ“… Tarehe ya Kuanza
                     </label>
                     <input
                       type="date"
@@ -1197,7 +1215,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
 
                   <div className="flex flex-col">
                     <label className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
-                      🏁 Tarehe ya Kumaliza Dawa
+                      ðŸ Tarehe ya Kumaliza Dawa
                     </label>
                     <input
                       type="date"
@@ -1211,11 +1229,11 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                 {/* Nyakati za Kila Siku za kutuma SMS */}
                 <div className="bg-white p-3 rounded-lg border border-primary/20 space-y-2">
                   <label className="text-xs font-bold text-primary block">
-                    🔔 Nyakati za Kila Siku za Kutuma SMS za Ukumbusho wa Dawa:
+                    ðŸ”” Nyakati za Kila Siku za Kutuma SMS za Ukumbusho wa Dawa:
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-200">
-                      <span className="text-xs font-bold text-amber-900">☀️ Asubuhi:</span>
+                      <span className="text-xs font-bold text-amber-900">â˜€ï¸ Asubuhi:</span>
                       <input
                         type="time"
                         value={morningTime}
@@ -1224,7 +1242,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                       />
                     </div>
                     <div className="flex items-center justify-between bg-blue-50 p-2 rounded border border-blue-200">
-                      <span className="text-xs font-bold text-blue-900">🌤️ Mchana:</span>
+                      <span className="text-xs font-bold text-blue-900">ðŸŒ¤ï¸ Mchana:</span>
                       <input
                         type="time"
                         value={afternoonTime}
@@ -1233,7 +1251,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                       />
                     </div>
                     <div className="flex items-center justify-between bg-indigo-50 p-2 rounded border border-indigo-200">
-                      <span className="text-xs font-bold text-indigo-900">🌙 Jioni / Usiku:</span>
+                      <span className="text-xs font-bold text-indigo-900">ðŸŒ™ Jioni / Usiku:</span>
                       <input
                         type="time"
                         value={eveningTime}
@@ -1247,7 +1265,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                 {/* Maelezo ya Ziada / Usage Notes */}
                 <div className="flex flex-col">
                   <label className="text-xs font-bold text-primary mb-1">
-                    📝 Maelezo ya Ziada / Maelekezo ya Matumizi ya Dawa
+                    ðŸ“ Maelezo ya Ziada / Maelekezo ya Matumizi ya Dawa
                   </label>
                   <input
                     type="text"
@@ -1499,7 +1517,7 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                     />
                     <div>
                       <p className="text-xs font-bold text-primary leading-tight uppercase line-clamp-1">{p.name}</p>
-                      <p className="text-[10px] text-secondary font-mono font-bold mt-0.5">{p.cardNumber} • {p.phone}</p>
+                      <p className="text-[10px] text-secondary font-mono font-bold mt-0.5">{p.cardNumber} â€¢ {p.phone}</p>
                     </div>
                   </div>
                   <button
