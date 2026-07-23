@@ -360,7 +360,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     window.open(waUrl, "_blank", "noopener,noreferrer");
   };
 
-  // Helper function to execute Oasis API requests with CORS proxy and direct fallback
+  // Helper function to execute Oasis API requests with server proxy (send.js) and direct fallback
   const executeOasisSmsRequest = async (
     targetUrl: string,
     apiKey: string,
@@ -368,75 +368,80 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     recipientPhone: string,
     messageText: string
   ): Promise<Response> => {
-    const payload = {
-      sender_id: senderId,
-      recipient: recipientPhone,
-      message: messageText,
+    const serverPayload = {
+      apiKey: apiKey.trim(),
       from: senderId,
-      to: [recipientPhone],
-      mobile: recipientPhone,
+      to: recipientPhone,
       text: messageText,
-      api_key: apiKey.trim(),
-      apiKey: apiKey.trim()
+      baseUrl: targetUrl
     };
 
     let response: Response | null = null;
 
-    if (useCorsProxy) {
-      // 1. Try public CORS proxy 1 (corsproxy.io)
-      try {
-        const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-        const res = await fetch(corsProxyUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey.trim()}`,
-            "Accept": "application/json"
-          },
-          body: JSON.stringify(payload)
-        });
-        const contentType = res.headers.get("content-type") || "";
-        if (!contentType.includes("text/html")) {
-          response = res;
-        }
-      } catch (e) {
-        // corsproxy failed
+    // 1. Primary: Try calling server API route /api/sms/send (send.js)
+    try {
+      const apiResp = await fetch("/api/sms/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(serverPayload)
+      });
+      if (apiResp.status !== 404 && apiResp.status !== 405) {
+        response = apiResp;
       }
+    } catch (err) {
+      // Server proxy call failed or not found
+    }
 
-      // 2. Try public CORS proxy 2 (allorigins)
-      if (!response) {
+    // 2. Fallback: If /api/sms/send unavailable, try public CORS proxy or direct fetch
+    if (!response) {
+      const directPayload = {
+        sender_id: senderId,
+        sender: senderId,
+        from: senderId,
+        recipient: recipientPhone,
+        mobile: recipientPhone,
+        to: recipientPhone,
+        message: messageText,
+        text: messageText,
+        api_key: apiKey.trim(),
+        apiKey: apiKey.trim()
+      };
+
+      if (useCorsProxy) {
         try {
-          const allOriginsUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-          const res = await fetch(allOriginsUrl, {
+          const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+          const res = await fetch(corsProxyUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${apiKey.trim()}`,
               "Accept": "application/json"
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(directPayload)
           });
           const contentType = res.headers.get("content-type") || "";
           if (!contentType.includes("text/html")) {
             response = res;
           }
         } catch (e) {
-          // allorigins failed
+          // Cors proxy failed
         }
       }
-    }
 
-    // 3. Fallback to Direct Fetch
-    if (!response) {
-      response = await fetch(targetUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey.trim()}`,
-          "Accept": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
+      if (!response) {
+        response = await fetch(targetUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey.trim()}`,
+            "Accept": "application/json"
+          },
+          body: JSON.stringify(directPayload)
+        });
+      }
     }
 
     return response;
