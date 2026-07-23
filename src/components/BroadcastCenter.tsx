@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { Patient } from "../types";
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { db } from "../lib/firebase";
 
 interface BroadcastCenterProps {
   patients: Patient[];
