@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { Patient } from "../types";
 import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { db } from "../firebase";
 
 interface BroadcastCenterProps {
   patients: Patient[];
@@ -115,6 +115,56 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
   const [showCloudFunctionModal, setShowCloudFunctionModal] = useState<boolean>(false);
   const [reminderDispatchLogs, setReminderDispatchLogs] = useState<{ id: string; name: string; phone: string; time: string; status: "success" | "failed"; detail: string }[]>([]);
+
+  // --- AUTOMATED IN-APP CRON / AUTO-DISPATCHER ENGINE ---
+  const [autoDispatcherEnabled, setAutoDispatcherEnabled] = useState<boolean>(() => {
+    return localStorage.getItem("oasis_auto_dispatcher") !== "false";
+  });
+  const [lastCronCheck, setLastCronCheck] = useState<string>("");
+  const [sentTodayKeys, setSentTodayKeys] = useState<Set<string>>(new Set());
+
+  // Auto save Auto-Dispatcher setting
+  useEffect(() => {
+    localStorage.setItem("oasis_auto_dispatcher", String(autoDispatcherEnabled));
+  }, [autoDispatcherEnabled]);
+
+  // Background timer checking active reminder slots every 30 seconds
+  useEffect(() => {
+    if (!autoDispatcherEnabled) return;
+
+    const checkScheduledSlots = () => {
+      const now = new Date();
+      const currentHHMM = now.toTimeString().slice(0, 5); // e.g. "08:00"
+      const dateStr = now.toISOString().split("T")[0]; // "2026-07-23"
+      setLastCronCheck(`${currentHHMM}:${now.getSeconds().toString().padStart(2, "0")}`);
+
+      const activeList = firebaseReminders.filter((r) => r.haliYaUkumbusho === "HAI");
+
+      activeList.forEach((reminder) => {
+        const slots = [
+          { label: "Asubuhi", time: reminder.mudaAsubuhi || "08:00" },
+          { label: "Mchana", time: reminder.mudaMchana || "14:00" },
+          { label: "Jioni", time: reminder.mudaJioni || "20:00" }
+        ];
+
+        slots.forEach((slot) => {
+          if (!slot.time) return;
+          const cleanTime = slot.time.trim().split(" ")[0]; // Handles "08:00 AM" -> "08:00"
+          if (cleanTime === currentHHMM) {
+            const dedupeKey = `${dateStr}_${reminder.id}_${slot.label}`;
+            if (!sentTodayKeys.has(dedupeKey)) {
+              setSentTodayKeys((prev) => new Set(prev).add(dedupeKey));
+              handleTriggerSingleReminderSMS(reminder, `âš¡ Auto-Cron (${slot.label})`, false);
+            }
+          }
+        });
+      });
+    };
+
+    checkScheduledSlots();
+    const interval = setInterval(checkScheduledSlots, 30000);
+    return () => clearInterval(interval);
+  }, [autoDispatcherEnabled, firebaseReminders, sentTodayKeys]);
 
   // Auto save Oasis credentials to localStorage
   useEffect(() => {
@@ -240,7 +290,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
   };
 
   // Trigger Instant Medication Reminder SMS via Oasis API
-  const handleTriggerSingleReminderSMS = async (reminder: FirebaseReminder, slotLabel: string = "Asubuhi") => {
+  const handleTriggerSingleReminderSMS = async (reminder: FirebaseReminder, slotLabel: string = "Asubuhi", showAlert: boolean = true) => {
     setSendingReminderId(reminder.id);
     const recipientPhone = formatTanzaniaPhone(reminder.nambaSimu);
     const sender = oasisSenderId.trim() || "AHC MKONONI";
@@ -272,7 +322,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
         phone: reminder.nambaSimu,
         time: new Date().toLocaleTimeString(),
         status: isSuccess ? ("success" as const) : ("failed" as const),
-        detail: detailMsg
+        detail: `[${slotLabel}] ${detailMsg}`
       };
 
       setReminderDispatchLogs(prev => [logEntry, ...prev]);
@@ -286,16 +336,48 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
         console.error("Failed to update timestamp in Firestore:", err);
       }
 
-      if (isSuccess) {
-        alert(`âœ… Imefanikiwa! Ukumbusho wa SMS (${slotLabel}) umetumwa kwa ${reminder.jinaMgonjwa} (${recipientPhone}) kupitia Oasis SMS Gateway.`);
-      } else {
-        alert(`âŒ Imeshindikana kutuma SMS kwa ${reminder.jinaMgonjwa}: ${detailMsg}`);
+      if (showAlert) {
+        if (isSuccess) {
+          alert(`âœ… Imefanikiwa! Ukumbusho wa SMS (${slotLabel}) umetumwa kwa ${reminder.jinaMgonjwa} (${recipientPhone}) kupitia Oasis SMS Gateway.`);
+        } else {
+          alert(`âŒ Imeshindikana kutuma SMS kwa ${reminder.jinaMgonjwa}: ${detailMsg}`);
+        }
       }
     } catch (err: any) {
-      alert(`Hitilafu ya mtandao: ${err.message}`);
+      if (showAlert) {
+        alert(`Hitilafu ya mtandao: ${err.message}`);
+      }
     } finally {
       setSendingReminderId(null);
     }
+  };
+
+  // Batch send medication reminders to ALL active patients now
+  const handleBatchSendAllActiveReminders = async (slotLabel: string = "Asubuhi") => {
+    const activeList = firebaseReminders.filter((r) => r.haliYaUkumbusho === "HAI");
+    if (activeList.length === 0) {
+      alert("Hakuna wagonjwa wenye ratiba za ukumbusho zilizo HAI (Active) kwa sasa.");
+      return;
+    }
+
+    if (!oasisApiKey.trim()) {
+      alert("âš ï¸ Oasis API Key haijawekwa! Tafadhali weka API Key kwenye Mipangilio ya Oasis API Key kwanza.");
+      setShowApiSettings(true);
+      return;
+    }
+
+    const confirmSend = window.confirm(
+      `Unakaribia kutuma ukumbusho wa SMS (${slotLabel}) kwa wagonjwa wote ${activeList.length} waliopo kwenye mfumo wa Firebase. Unapenda kuendelea?`
+    );
+    if (!confirmSend) return;
+
+    for (let i = 0; i < activeList.length; i++) {
+      const reminder = activeList[i];
+      await handleTriggerSingleReminderSMS(reminder, `Batch ${slotLabel}`, false);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    alert(`âœ… Mchakato wa kutuma ukumbusho wa SMS (${slotLabel}) kwa wagonjwa wote ${activeList.length} umekamilika! Angalia kumbukumbu za utumaji hapo chini.`);
   };
 
   // Toggle Reminder Active/Inactive Status in Firestore
@@ -1433,6 +1515,69 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
               <FileCode className="w-4 h-4" />
               <span>Soma Code ya Utumaji wa Kiotomatiki (Cloud Function)</span>
             </button>
+          </div>
+
+          {/* LIVE AUTO-DISPATCHER CONTROL PANEL & BATCH CONTROLS */}
+          <div className="bg-emerald-50 border-2 border-emerald-300 p-4 sm:p-5 rounded-2xl space-y-4 shadow-sm">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-emerald-200 pb-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-emerald-950 font-black text-xs sm:text-sm uppercase tracking-wide">
+                  <Zap className="w-5 h-5 text-amber-500 fill-amber-400 animate-pulse" />
+                  <span>MFUMO WA UTUMAJI WA KIOTOMATIKI WA KIVINJARI (LIVE IN-APP AUTO-DISPATCHER)</span>
+                </div>
+                <p className="text-xs text-emerald-800">
+                  Ukiwa umewashwa, mfumo utakagua ratiba za leo kila baada ya sekunde 30 na kutuma SMS za Subhi (08:00), Mchana (14:00), au Jioni (20:00) kiotomatiki.
+                </p>
+              </div>
+
+              {/* Toggle Auto-Dispatcher */}
+              <label className="flex items-center gap-3 cursor-pointer bg-white px-4 py-2 rounded-xl border-2 border-emerald-300 shadow-xs">
+                <input
+                  type="checkbox"
+                  checked={autoDispatcherEnabled}
+                  onChange={(e) => setAutoDispatcherEnabled(e.target.checked)}
+                  className="w-5 h-5 accent-emerald-600 rounded cursor-pointer"
+                />
+                <span className="text-xs font-black uppercase text-emerald-950">
+                  {autoDispatcherEnabled ? "ðŸŸ¢ Auto-Dispatcher Imewashwa (Active)" : "ðŸ”´ Auto-Dispatcher Imesitishwa"}
+                </span>
+              </label>
+            </div>
+
+            {/* Live Status Indicators & Quick Batch Buttons */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
+              <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-emerald-900">
+                <span className="bg-white px-3 py-1 rounded-lg border border-emerald-200 shadow-xs flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-emerald-600" />
+                  <span>Kukagua kwa Mwisho: <strong>{lastCronCheck || "Saa ya Sasa"}</strong></span>
+                </span>
+                <span className="bg-white px-3 py-1 rounded-lg border border-emerald-200 shadow-xs flex items-center gap-1.5">
+                  <Bell className="w-4 h-4 text-amber-600" />
+                  <span>Wagonjwa Walio Active: <strong>{firebaseReminders.filter(r => r.haliYaUkumbusho === "HAI").length}</strong></span>
+                </span>
+              </div>
+
+              {/* Quick Batch Actions */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-extrabold text-emerald-950 uppercase tracking-wider hidden sm:inline">
+                  Tuma Vyote Sasa (Batch):
+                </span>
+                <button
+                  onClick={() => handleBatchSendAllActiveReminders("Subhi (Asubuhi)")}
+                  className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs rounded-lg shadow-xs transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Tuma Subhi Yote</span>
+                </button>
+                <button
+                  onClick={() => handleBatchSendAllActiveReminders("Mchana / Jioni")}
+                  className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-black text-xs rounded-lg shadow-xs transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Tuma Jioni Yote</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* List of Firebase Reminders */}
