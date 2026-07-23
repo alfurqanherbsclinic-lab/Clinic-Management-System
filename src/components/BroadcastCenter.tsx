@@ -128,30 +128,62 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     localStorage.setItem("oasis_auto_dispatcher", String(autoDispatcherEnabled));
   }, [autoDispatcherEnabled]);
 
-  // Background timer checking active reminder slots every 30 seconds
+  // Background timer checking active reminder slots every 15 seconds
   useEffect(() => {
     if (!autoDispatcherEnabled) return;
 
+    const parseTimeToMinutes = (timeStr: string): number | null => {
+      if (!timeStr) return null;
+      const trimmed = timeStr.trim();
+      const isPM = /pm/i.test(trimmed);
+      const isAM = /am/i.test(trimmed);
+      const cleanStr = trimmed.replace(/[^\d:]/g, "");
+      const parts = cleanStr.split(":");
+      if (parts.length < 2) return null;
+
+      let hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+      if (isNaN(hours) || isNaN(minutes)) return null;
+
+      if (isPM && hours < 12) hours += 12;
+      if (isAM && hours === 12) hours = 0;
+
+      return hours * 60 + minutes;
+    };
+
     const checkScheduledSlots = () => {
       const now = new Date();
-      const currentHHMM = now.toTimeString().slice(0, 5); // e.g. "08:00"
-      const dateStr = now.toISOString().split("T")[0]; // "2026-07-23"
-      setLastCronCheck(`${currentHHMM}:${now.getSeconds().toString().padStart(2, "0")}`);
+      const currentHours = now.getHours();
+      const currentMinutes = now.getMinutes();
+      const currentTotalMinutes = currentHours * 60 + currentMinutes;
+
+      const localYear = now.getFullYear();
+      const localMonth = String(now.getMonth() + 1).padStart(2, "0");
+      const localDay = String(now.getDate()).padStart(2, "0");
+      const todayLocalDateStr = `${localYear}-${localMonth}-${localDay}`;
+
+      const currentHHMM = `${String(currentHours).padStart(2, "0")}:${String(currentMinutes).padStart(2, "0")}`;
+      const currentHHMMSS = `${currentHHMM}:${String(now.getSeconds()).padStart(2, "0")}`;
+      setLastCronCheck(currentHHMMSS);
 
       const activeList = firebaseReminders.filter((r) => r.haliYaUkumbusho === "HAI");
 
       activeList.forEach((reminder) => {
         const slots = [
-          { label: "Asubuhi", time: reminder.mudaAsubuhi || "08:00" },
+          { label: "Subhi (Asubuhi)", time: reminder.mudaAsubuhi || "08:00" },
           { label: "Mchana", time: reminder.mudaMchana || "14:00" },
           { label: "Jioni", time: reminder.mudaJioni || "20:00" }
         ];
 
         slots.forEach((slot) => {
           if (!slot.time) return;
-          const cleanTime = slot.time.trim().split(" ")[0]; // Handles "08:00 AM" -> "08:00"
-          if (cleanTime === currentHHMM) {
-            const dedupeKey = `${dateStr}_${reminder.id}_${slot.label}`;
+          const slotMinutes = parseTimeToMinutes(slot.time);
+          if (slotMinutes === null) return;
+
+          // Trigger strictly when current time arrives at scheduled slot time (0 to 3 minutes window)
+          const minutesDiff = currentTotalMinutes - slotMinutes;
+          if (minutesDiff >= 0 && minutesDiff <= 3) {
+            const dedupeKey = `${todayLocalDateStr}_${reminder.id}_${slot.label}`;
             if (!sentTodayKeys.has(dedupeKey)) {
               setSentTodayKeys((prev) => new Set(prev).add(dedupeKey));
               handleTriggerSingleReminderSMS(reminder, `âš¡ Auto-Cron (${slot.label})`, false);
@@ -162,7 +194,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     };
 
     checkScheduledSlots();
-    const interval = setInterval(checkScheduledSlots, 30000);
+    const interval = setInterval(checkScheduledSlots, 15000);
     return () => clearInterval(interval);
   }, [autoDispatcherEnabled, firebaseReminders, sentTodayKeys]);
 
@@ -1682,11 +1714,11 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
                           <span>Tuma Papo Hapo:</span>
                         </span>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <button
                             disabled={isSendingThis}
-                            onClick={() => handleTriggerSingleReminderSMS(reminder, "Asubuhi")}
-                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] shadow-sm cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1"
+                            onClick={() => handleTriggerSingleReminderSMS(reminder, "Subhi (Asubuhi)")}
+                            className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[10px] shadow-sm cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1"
                           >
                             {isSendingThis ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
                             <span>SMS Subhi</span>
@@ -1694,8 +1726,17 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
                           <button
                             disabled={isSendingThis}
-                            onClick={() => handleTriggerSingleReminderSMS(reminder, "Mchana/Jioni")}
-                            className="px-2.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg text-[11px] shadow-sm cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1"
+                            onClick={() => handleTriggerSingleReminderSMS(reminder, "Mchana")}
+                            className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[10px] shadow-sm cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1"
+                          >
+                            {isSendingThis ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                            <span>SMS Mchana</span>
+                          </button>
+
+                          <button
+                            disabled={isSendingThis}
+                            onClick={() => handleTriggerSingleReminderSMS(reminder, "Jioni")}
+                            className="px-2 py-1 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg text-[10px] shadow-sm cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1"
                           >
                             {isSendingThis ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
                             <span>SMS Jioni</span>
