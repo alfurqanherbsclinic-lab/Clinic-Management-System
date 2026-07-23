@@ -1,0 +1,38 @@
+{
+  "entities": {
+    "reminders": {
+      "title": "Reminders",
+      "description": "Medication reminders for clinic patients",
+      "type": "object",
+      "properties": {
+        "jinaMgonjwa": { "type": "string" },
+        "nambaSimu": { "type": "string" },
+        "dawaAlizopewa": { "type": "string" },
+        "maraNgapiKwaSiku": { "type": "string" },
+        "mudaAsubuhi": { "type": "string" },
+        "mudaMchana": { "type": "string" },
+        "mudaJioni": { "type": "string" },
+        "sikuZaUkumbusho": { "type": "number" },
+        "tareheYaKuanza": { "type": "string" },
+        "tareheYaKumaliza": { "type": "string" },
+        "maelezoYaZiada": { "type": "string" },
+        "haliYaUkumbusho": { "type": "string" },
+        "tareheIliyowashwa": { "type": "string" },
+        "mudaWaMwishoKutuma": { "type": "string" }
+      },
+      "required": [
+        "jinaMgonjwa",
+        "nambaSimu",
+        "sikuZaUkumbusho",
+        "haliYaUkumbusho",
+        "tareheIliyowashwa"
+      ]
+    }
+  },
+  "firestore": {
+    "/patient_reminders/{reminderId}": {
+      "schema": { "$ref": "#/entities/reminders" },
+      "description": "Collection of patient medication reminders synced in real-time"
+    }
+  }
+}
