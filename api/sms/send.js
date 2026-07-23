@@ -1,8 +1,8 @@
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
@@ -14,29 +14,32 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { apiKey, from, to, text, baseUrl } = req.body;
-    
-    // Safisha baseUrl isome URL sahihi tu bila kujirudia
+    const { apiKey, from, to, text, baseUrl } = req.body || {};
+
     let targetUrl = 'https://bulksms.oasistech.co.tz/api/sms';
-    if (baseUrl && baseUrl.startsWith('http')) {
-      // Chagua ile URL ya kwanza tu kama zimegongana
-      targetUrl = baseUrl.split(']')[0].replace('[', '').trim();
+    if (baseUrl && typeof baseUrl === 'string' && baseUrl.startsWith('http')) {
+      targetUrl = baseUrl.split('|')[0].replace('[', '').trim();
       if (!targetUrl.startsWith('http')) {
         targetUrl = 'https://bulksms.oasistech.co.tz/api/sms';
       }
     }
 
     let simu = Array.isArray(to) ? to[0] : to;
-    simu = String(simu).trim();
+    simu = String(simu || '').trim();
     if (simu.startsWith('0')) {
       simu = '255' + simu.substring(1);
     }
     simu = simu.replace('+', '');
 
+    const senderName = from || "AHC MKONONI";
     const payload = {
       to: simu,
+      recipient: simu,
       message: text,
-      sender: from || "AHC MKONONI"
+      text: text,
+      sender: senderName,
+      from: senderName,
+      sender_id: senderName
     };
 
     const response = await fetch(targetUrl, {
