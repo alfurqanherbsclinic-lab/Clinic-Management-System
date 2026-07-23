@@ -23,11 +23,15 @@ import {
   Cloud,
   FileCode,
   Pill,
-  CheckCheck
+  CheckCheck,
+  Trash2,
+  Edit3,
+  Save,
+  X
 } from "lucide-react";
 import { Patient } from "../types";
-import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { collection, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { db } from "../firebase";
 
 interface BroadcastCenterProps {
   patients: Patient[];
@@ -113,6 +117,10 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
   // --- FIREBASE PATIENT REMINDERS STATES ---
   const [firebaseReminders, setFirebaseReminders] = useState<FirebaseReminder[]>([]);
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
+  const [editingReminderId, setEditingReminderId] = useState<string | null>(null);
+  const [editSubhiTime, setEditSubhiTime] = useState<string>("08:00");
+  const [editMchanaTime, setEditMchanaTime] = useState<string>("14:00");
+  const [editJioniTime, setEditJioniTime] = useState<string>("20:00");
   const [showCloudFunctionModal, setShowCloudFunctionModal] = useState<boolean>(false);
   const [reminderDispatchLogs, setReminderDispatchLogs] = useState<{ id: string; name: string; phone: string; time: string; status: "success" | "failed"; detail: string }[]>([]);
 
@@ -189,7 +197,26 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
       const currentHHMMSS = `${currentHHMM}:${String(now.getSeconds()).padStart(2, "0")}`;
       setLastCronCheck(currentHHMMSS);
 
-      const activeList = firebaseReminders.filter((r) => r.haliYaUkumbusho === "HAI");
+      // Filter out duplicate active reminders for the same phone number (keep newest)
+      const phoneMap = new Map<string, FirebaseReminder>();
+      firebaseReminders
+        .filter((r) => r.haliYaUkumbusho === "HAI")
+        .forEach((r) => {
+          const cleanPhone = (r.nambaSimu || "").replace(/[^\d]/g, "");
+          if (!cleanPhone) return;
+          const existing = phoneMap.get(cleanPhone);
+          if (!existing) {
+            phoneMap.set(cleanPhone, r);
+          } else {
+            const timeNew = new Date(r.tareheIliyowashwa || 0).getTime();
+            const timeOld = new Date(existing.tareheIliyowashwa || 0).getTime();
+            if (timeNew >= timeOld) {
+              phoneMap.set(cleanPhone, r);
+            }
+          }
+        });
+
+      const activeList = Array.from(phoneMap.values());
 
       activeList.forEach((reminder) => {
         const slots = [
@@ -208,7 +235,8 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
           const minutesDiff = currentTotalMinutes - slotMinutes;
           if (minutesDiff >= 0 && minutesDiff <= 1) {
             const cleanTime = slot.time.trim();
-            const dedupeKey = `${todayLocalDateStr}_${reminder.id}_${slot.label}_${cleanTime}`;
+            const cleanPhone = (reminder.nambaSimu || "").replace(/[^\d]/g, "");
+            const dedupeKey = `${todayLocalDateStr}_${cleanPhone}_${slot.label}_${cleanTime}`;
             if (!sentTodayKeys.has(dedupeKey)) {
               markKeyAsSentToday(dedupeKey);
               handleTriggerSingleReminderSMS(reminder, `âš¡ Auto-Cron (${slot.label})`, false);
@@ -447,6 +475,41 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
       alert(`Hali ya ukumbusho ya ${reminder.jinaMgonjwa} imebadilishwa kuwa: ${newStatus}`);
     } catch (err: any) {
       alert("Hitilafu katika kubadilisha hali: " + err.message);
+    }
+  };
+
+  // Delete Reminder document from Firestore
+  const handleDeleteReminder = async (reminderId: string, name: string) => {
+    if (!window.confirm(`Unauhakika unataka kufuta kabisa ratiba ya ukumbusho ya ${name}?`)) return;
+    try {
+      await deleteDoc(doc(db, "patient_reminders", reminderId));
+      alert(`âœ… Ratiba ya ukumbusho ya ${name} imefutwa kikamilifu kutoka Firebase Database.`);
+    } catch (err: any) {
+      alert("Hitilafu wakati wa kufuta ratiba: " + err.message);
+    }
+  };
+
+  // Start editing times for a reminder card
+  const handleStartEditingTimes = (reminder: FirebaseReminder) => {
+    setEditingReminderId(reminder.id);
+    setEditSubhiTime(reminder.mudaAsubuhi || "08:00");
+    setEditMchanaTime(reminder.mudaMchana || "14:00");
+    setEditJioniTime(reminder.mudaJioni || "20:00");
+  };
+
+  // Save updated times directly to Firestore doc
+  const handleSaveUpdatedTimes = async (reminderId: string, name: string) => {
+    try {
+      await updateDoc(doc(db, "patient_reminders", reminderId), {
+        mudaAsubuhi: editSubhiTime,
+        mudaMchana: editMchanaTime,
+        mudaJioni: editJioniTime,
+        tareheIliyowashwa: new Date().toISOString()
+      });
+      setEditingReminderId(null);
+      alert(`âœ… Muda mpya wa ukumbusho wa ${name} umehifadhiwa kikamilifu:\nâ˜€ï¸ Asubuhi: ${editSubhiTime}\nðŸŒ¤ï¸ Mchana: ${editMchanaTime}\nðŸŒ™ Jioni: ${editJioniTime}`);
+    } catch (err: any) {
+      alert("Hitilafu wakati wa kuhifadhi muda mpya: " + err.message);
     }
   };
 
@@ -1699,16 +1762,26 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
                           </p>
                         </div>
 
-                        <button
-                          onClick={() => handleToggleReminderStatus(reminder)}
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border cursor-pointer transition-colors ${
-                            isNoteActive
-                              ? "bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200"
-                              : "bg-gray-200 text-gray-700 border-gray-300 hover:bg-gray-300"
-                          }`}
-                        >
-                          {isNoteActive ? "HAI (ACTIVE)" : "IMESITISHWA"}
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleToggleReminderStatus(reminder)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border cursor-pointer transition-colors ${
+                              isNoteActive
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200"
+                                : "bg-gray-200 text-gray-700 border-gray-300 hover:bg-gray-300"
+                            }`}
+                          >
+                            {isNoteActive ? "HAI (ACTIVE)" : "IMESITISHWA"}
+                          </button>
+                          
+                          <button
+                            onClick={() => handleDeleteReminder(reminder.id, reminder.jinaMgonjwa)}
+                            title="Futa ratiba hii kabisa kutoka Firebase"
+                            className="p-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 cursor-pointer transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       {/* Details */}
@@ -1730,12 +1803,71 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
                           </div>
                         </div>
 
-                        {/* Timeslots */}
-                        <div className="flex items-center justify-between text-[11px] bg-slate-100 p-2 rounded-lg text-slate-700 font-medium">
-                          <span>â° Asubuhi: <strong>{reminder.mudaAsubuhi || "--:--"}</strong></span>
-                          <span>Mchana: <strong>{reminder.mudaMchana || "--:--"}</strong></span>
-                          <span>Jioni: <strong>{reminder.mudaJioni || "--:--"}</strong></span>
-                        </div>
+                        {/* Timeslots (Display or Inline Edit) */}
+                        {editingReminderId === reminder.id ? (
+                          <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-300 space-y-2 animate-fadeIn">
+                            <span className="text-[11px] font-extrabold text-amber-950 block">âœï¸ Badilisha Nyakati za SMS:</span>
+                            <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                              <div>
+                                <label className="block font-bold text-amber-900 mb-0.5">Asubuhi:</label>
+                                <input
+                                  type="time"
+                                  value={editSubhiTime}
+                                  onChange={(e) => setEditSubhiTime(e.target.value)}
+                                  className="w-full p-1 bg-white border border-amber-400 rounded font-mono font-bold"
+                                />
+                              </div>
+                              <div>
+                                <label className="block font-bold text-amber-900 mb-0.5">Mchana:</label>
+                                <input
+                                  type="time"
+                                  value={editMchanaTime}
+                                  onChange={(e) => setEditMchanaTime(e.target.value)}
+                                  className="w-full p-1 bg-white border border-amber-400 rounded font-mono font-bold"
+                                />
+                              </div>
+                              <div>
+                                <label className="block font-bold text-amber-900 mb-0.5">Jioni:</label>
+                                <input
+                                  type="time"
+                                  value={editJioniTime}
+                                  onChange={(e) => setEditJioniTime(e.target.value)}
+                                  className="w-full p-1 bg-white border border-amber-400 rounded font-mono font-bold"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-1.5 pt-1">
+                              <button
+                                onClick={() => setEditingReminderId(null)}
+                                className="px-2 py-1 bg-gray-200 text-gray-700 font-bold text-[10px] rounded cursor-pointer"
+                              >
+                                Ghairi
+                              </button>
+                              <button
+                                onClick={() => handleSaveUpdatedTimes(reminder.id, reminder.jinaMgonjwa)}
+                                className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[10px] rounded cursor-pointer flex items-center gap-1"
+                              >
+                                <Save className="w-3 h-3" />
+                                Hifadhi Muda
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between text-[11px] bg-slate-100 p-2 rounded-lg text-slate-700 font-medium">
+                            <div className="flex items-center gap-2">
+                              <span>â° Subhi: <strong>{reminder.mudaAsubuhi || "--:--"}</strong></span>
+                              <span>Mchana: <strong>{reminder.mudaMchana || "--:--"}</strong></span>
+                              <span>Jioni: <strong>{reminder.mudaJioni || "--:--"}</strong></span>
+                            </div>
+                            <button
+                              onClick={() => handleStartEditingTimes(reminder)}
+                              title="Badilisha muda wa ukumbusho"
+                              className="p-1 rounded bg-slate-200 text-slate-700 hover:bg-slate-300 cursor-pointer ml-1"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
 
                         {reminder.mudaWaMwishoKutuma && (
                           <div className="text-[10px] text-gray-500 flex items-center gap-1 font-mono pt-1">
