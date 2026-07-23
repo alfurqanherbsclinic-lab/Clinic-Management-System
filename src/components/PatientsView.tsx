@@ -21,8 +21,7 @@ import {
 import { Patient } from "../types";
 import BroadcastCenter from "./BroadcastCenter";
 import { collection, addDoc } from "firebase/firestore";
-import { db } from "../lib/firebase";
-
+import { db } from "../firebase";
 
 interface PatientAvatarProps {
   src: string;
@@ -101,9 +100,30 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
   const [nextOfKin, setNextOfKin] = useState("");
 
   // States for Usimamizi wa Vikumbusho vya Dawa (Medication Reminders Management)
-  const [reminderDays, setReminderDays] = useState("7");
+  const [medicationName, setMedicationName] = useState("Amoxicillin 500mg, Paracetamol 1000mg");
+  const [medicationFrequency, setMedicationFrequency] = useState("Mara 3 kwa siku (Kila saa 8)");
+  const [medicationStartTime, setMedicationStartTime] = useState("08:00 AM (Asubuhi)");
+  const [reminderDays, setReminderDays] = useState("14");
+  const [medicationStartDate, setMedicationStartDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [medicationNotes, setMedicationNotes] = useState("Meza baada ya kula na maji mengi.");
+  const [morningTime, setMorningTime] = useState("08:00");
+  const [afternoonTime, setAfternoonTime] = useState("14:00");
+  const [eveningTime, setEveningTime] = useState("20:00");
   const [reminderActive, setReminderActive] = useState(false);
   const [reminderStatus, setReminderStatus] = useState("");
+
+  // Helper to calculate end date from start date and duration days
+  const getCalculatedEndDate = (startDateStr: string, daysStr: string) => {
+    try {
+      const d = new Date(startDateStr || new Date());
+      const days = parseInt(daysStr) || 14;
+      d.setDate(d.getDate() + days);
+      return d.toISOString().split("T")[0];
+    } catch {
+      return startDateStr;
+    }
+  };
+  const medicationEndDate = getCalculatedEndDate(medicationStartDate, reminderDays);
 
   // States for live interactive features
   const [searchQuery, setSearchQuery] = useState("");
@@ -261,10 +281,8 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
 
   // Handler for enabling automatic medication reminders
   const handleWashaVikumbusho = async () => {
-    const jinaInput = (document.getElementById('jinaKamili') as HTMLInputElement)?.value;
-    const nambaSimuInput = (document.getElementById('simu') as HTMLInputElement)?.value;
-    const selectElement = document.getElementById('sikuZaUkumbusho') as HTMLSelectElement;
-    const sikuZilizochaguliwa = selectElement ? selectElement.value : "7";
+    const jinaInput = name.trim() || (document.getElementById('jinaKamili') as HTMLInputElement)?.value;
+    const nambaSimuInput = phone.trim() || (document.getElementById('simu') as HTMLInputElement)?.value;
 
     if (!jinaInput || !nambaSimuInput) {
         alert("Tafadhali jaza Jina Kamili na Namba ya Simu ya mgonjwa kwanza!");
@@ -275,19 +293,28 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
         const taarifaZaUkumbusho = {
             jinaMgonjwa: jinaInput,
             nambaSimu: nambaSimuInput,
-            sikuZaUkumbusho: parseInt(sikuZilizochaguliwa),
+            dawaAlizopewa: medicationName || "Dawa za Hospitali",
+            maraNgapiKwaSiku: medicationFrequency,
+            mudaWaKuanza: medicationStartTime,
+            sikuZaUkumbusho: parseInt(reminderDays) || 14,
+            tareheYaKuanza: medicationStartDate,
+            tareheYaKumaliza: medicationEndDate,
+            mudaAsubuhi: morningTime,
+            mudaMchana: afternoonTime,
+            mudaJioni: eveningTime,
+            maelezoYaZiada: medicationNotes,
             haliYaUkumbusho: "HAI",
             tareheIliyowashwa: new Date().toISOString()
         };
 
-        console.log("Saving data to Firebase:", taarifaZaUkumbusho);
+        console.log("Saving medication reminders to Firebase:", taarifaZaUkumbusho);
         
         // Hifadhi moja kwa moja kwenye Firebase Firestore Database
         await addDoc(collection(db, "patient_reminders"), taarifaZaUkumbusho);
 
         setReminderActive(true);
-        setReminderStatus(`Vikumbusho otomatiki vya siku ${sikuZilizochaguliwa} vimewashwa na kuhifadhiwa kwenye database kwa ajili ya ${jinaInput}.`);
-        alert(`Imefaulu! Vikumbusho vya siku ${sikuZilizochaguliwa} vimewashwa na kuhifadhiwa kikamilifu kwenye Firebase Database kwa ajili ya ${jinaInput}.`);
+        setReminderStatus(`Vikumbusho otomatiki vya siku ${reminderDays} (Hadi ${medicationEndDate}) vimewashwa na kuhifadhiwa kwa ajili ya ${jinaInput} (${medicationName}).`);
+        alert(`Imefaulu! Vikumbusho vya siku ${reminderDays} vimewashwa na kuhifadhiwa kikamilifu kwenye Firebase Database kwa ajili ya ${jinaInput}.\n\nðŸ’Š Dawa: ${medicationName}\nðŸ”„ Mzunguko: ${medicationFrequency}\nðŸ“… Tarehe ya Kuanza: ${medicationStartDate}\nðŸ Tarehe ya Kumaliza: ${medicationEndDate}`);
     } catch (error: any) {
         console.error("Firebase save error:", error);
         alert("Imeshindikana kuhifadhi vikumbusho kwenye Firebase: " + error.message);
@@ -386,7 +413,18 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
       guardian,
       maritalStatus,
       nextOfKin: nextOfKin || `${emergencyName} (${emergencyRelation})`,
-      registrationDate: new Date().toISOString().split("T")[0]
+      registrationDate: new Date().toISOString().split("T")[0],
+      medicationReminder: {
+        medicationName,
+        frequency: medicationFrequency,
+        startTime: medicationStartTime,
+        timesPerDay: [morningTime, afternoonTime, eveningTime].filter(Boolean),
+        durationDays: parseInt(reminderDays) || 14,
+        startDate: medicationStartDate,
+        endDate: medicationEndDate,
+        notes: medicationNotes,
+        active: reminderActive
+      }
     };
 
     onAddPatient(newPatient);
@@ -953,17 +991,94 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
             </div>
 
             {/* Segment E: Usimamizi wa Vikumbusho vya Dawa (Medication Reminders Management) */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-secondary uppercase tracking-widest border-b border-primary/20 pb-1 flex items-center gap-2">
-                <Bell className="w-4 h-4 text-[#D6145A]" />
-                <span>E. Usimamizi wa Vikumbusho vya Dawa (Medication Reminders Management)</span>
-              </h4>
-              <div className="bg-slate-50 p-4 rounded-lg border-2 border-primary/20 space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-primary/20 pb-2">
+                <h4 className="text-xs font-bold text-secondary uppercase tracking-widest flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-[#D6145A]" />
+                  <span>E. Usimamizi wa Vikumbusho vya Dawa (Medication Reminders Management)</span>
+                </h4>
+                <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-2.5 py-0.5 rounded-full font-mono border border-rose-300">
+                  SMS Otomatiki za Oasis
+                </span>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-50 to-rose-50/40 p-4 rounded-xl border-2 border-rose-200 space-y-4 shadow-sm">
+                
+                {/* Auto-filled patient info banner */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-primary/10 shadow-2xs">
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-600 block mb-1">
+                      ðŸ‘¤ Jina la Mgonjwa:
+                    </label>
+                    <div className="p-2 bg-gray-50 border border-gray-300 rounded font-bold text-xs text-primary truncate">
+                      {name.trim() ? name.toUpperCase() : "(Jaza Jina Kamili hapo juu A)"}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-600 block mb-1">
+                      ðŸ“± Namba ya Simu ya Ukumbusho:
+                    </label>
+                    <div className="p-2 bg-gray-50 border border-gray-300 rounded font-bold text-xs text-primary truncate">
+                      {phone.trim() ? phone : "(Jaza Simu hapo juu A)"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dawa Alizopewa & Mara ngapi kwa siku */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col">
+                    <label className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
+                      ðŸ’Š Dawa Alizopewa (Prescribed Medication) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={medicationName}
+                      onChange={(e) => setMedicationName(e.target.value)}
+                      placeholder="Mf. Amoxicillin 500mg, Paracetamol 1000mg"
+                      className="p-2.5 border-2 border-primary rounded-lg text-xs font-bold bg-white focus:outline-none focus:border-[#D6145A]"
+                    />
+                  </div>
+
+                  <div className="flex flex-col">
+                    <label className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
+                      ðŸ”„ Mara ngapi atumie dawa? (Frequency) *
+                    </label>
+                    <select
+                      value={medicationFrequency}
+                      onChange={(e) => setMedicationFrequency(e.target.value)}
+                      className="p-2.5 border-2 border-primary rounded-lg text-xs font-bold bg-white focus:outline-none focus:border-[#D6145A]"
+                    >
+                      <option value="Mara 3 kwa siku (Kila saa 8)">Mara 3 kwa siku (Kila saa 8 - Asubuhi, Mchana, Jioni)</option>
+                      <option value="Mara 2 kwa siku (Kila saa 12)">Mara 2 kwa siku (Kila saa 12 - Asubuhi na Jioni)</option>
+                      <option value="Mara 1 kwa siku (Kila saa 24)">Mara 1 kwa siku (Kila saa 24 - Mara moja)</option>
+                      <option value="Mara 4 kwa siku (Kila saa 6)">Mara 4 kwa siku (Kila saa 6 - Mchana & Usiku)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Muda wa kuanza, Siku za matumizi, Tarehe ya Kuanza & Tarehe ya Kumaliza */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="flex flex-col">
+                    <label className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
+                      â° Muda wa Kuanza Kutumia
+                    </label>
+                    <select
+                      value={medicationStartTime}
+                      onChange={(e) => setMedicationStartTime(e.target.value)}
+                      className="p-2.5 border-2 border-primary rounded-lg text-xs font-bold bg-white focus:outline-none focus:border-[#D6145A]"
+                    >
+                      <option value="08:00 AM (Asubuhi)">08:00 AM (Asubuhi)</option>
+                      <option value="02:00 PM (Mchana)">02:00 PM (Mchana)</option>
+                      <option value="08:00 PM (Jioni)">08:00 PM (Jioni)</option>
+                      <option value="10:00 PM (Usiku)">10:00 PM (Usiku)</option>
+                    </select>
+                  </div>
+
                   <div className="flex flex-col">
                     <label className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-[#D6145A]" />
-                      Siku za Ukumbusho wa Dawa *
+                      Siku za Ukumbusho / Muda *
                     </label>
                     <select
                       id="sikuZaUkumbusho"
@@ -971,32 +1086,109 @@ export function PatientsView({ patients, onAddPatient, onDeletePatient }: Patien
                       onChange={(e) => setReminderDays(e.target.value)}
                       className="p-2.5 border-2 border-primary rounded-lg text-xs font-bold bg-white focus:outline-none focus:border-[#D6145A]"
                     >
+                      <option value="3">Siku 3</option>
+                      <option value="5">Siku 5</option>
                       <option value="7">Siku 7 (Wiki 1)</option>
                       <option value="14">Siku 14 (Wiki 2)</option>
                       <option value="30">Siku 30 (Mwezi 1)</option>
                     </select>
                   </div>
 
-                  <div className="md:col-span-2">
-                    <button
-                      type="button"
-                      onClick={handleWashaVikumbusho}
-                      className="w-full py-2.5 px-4 bg-[#D6145A] hover:bg-[#b00f48] text-white font-extrabold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md active:scale-[0.99]"
-                    >
-                      <Bell className="w-4 h-4 animate-bounce" />
-                      Washa Vikumbusho Otomatiki
-                    </button>
+                  <div className="flex flex-col">
+                    <label className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
+                      ðŸ“… Tarehe ya Kuanza
+                    </label>
+                    <input
+                      type="date"
+                      value={medicationStartDate}
+                      onChange={(e) => setMedicationStartDate(e.target.value)}
+                      className="p-2.5 border-2 border-primary rounded-lg text-xs font-bold bg-white focus:outline-none focus:border-[#D6145A]"
+                    />
+                  </div>
+
+                  <div className="flex flex-col">
+                    <label className="text-xs font-bold text-primary mb-1 flex items-center gap-1">
+                      ðŸ Tarehe ya Kumaliza Dawa
+                    </label>
+                    <input
+                      type="date"
+                      readOnly
+                      value={medicationEndDate}
+                      className="p-2.5 border-2 border-emerald-600 bg-emerald-50 rounded-lg text-xs font-black text-emerald-900 cursor-not-allowed"
+                    />
                   </div>
                 </div>
 
+                {/* Nyakati za Kila Siku za kutuma SMS */}
+                <div className="bg-white p-3 rounded-lg border border-primary/20 space-y-2">
+                  <label className="text-xs font-bold text-primary block">
+                    ðŸ”” Nyakati za Kila Siku za Kutuma SMS za Ukumbusho wa Dawa:
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="flex items-center justify-between bg-amber-50 p-2 rounded border border-amber-200">
+                      <span className="text-xs font-bold text-amber-900">â˜€ï¸ Asubuhi:</span>
+                      <input
+                        type="time"
+                        value={morningTime}
+                        onChange={(e) => setMorningTime(e.target.value)}
+                        className="p-1 text-xs border border-amber-300 rounded font-mono font-bold bg-white"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between bg-blue-50 p-2 rounded border border-blue-200">
+                      <span className="text-xs font-bold text-blue-900">ðŸŒ¤ï¸ Mchana:</span>
+                      <input
+                        type="time"
+                        value={afternoonTime}
+                        onChange={(e) => setAfternoonTime(e.target.value)}
+                        className="p-1 text-xs border border-blue-300 rounded font-mono font-bold bg-white"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between bg-indigo-50 p-2 rounded border border-indigo-200">
+                      <span className="text-xs font-bold text-indigo-900">ðŸŒ™ Jioni / Usiku:</span>
+                      <input
+                        type="time"
+                        value={eveningTime}
+                        onChange={(e) => setEveningTime(e.target.value)}
+                        className="p-1 text-xs border border-indigo-300 rounded font-mono font-bold bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Maelezo ya Ziada / Usage Notes */}
+                <div className="flex flex-col">
+                  <label className="text-xs font-bold text-primary mb-1">
+                    ðŸ“ Maelezo ya Ziada / Maelekezo ya Matumizi ya Dawa
+                  </label>
+                  <input
+                    type="text"
+                    value={medicationNotes}
+                    onChange={(e) => setMedicationNotes(e.target.value)}
+                    placeholder="Mf. Meza vidonge 2 kila masaa 8 baada ya chakula."
+                    className="p-2.5 border-2 border-primary rounded-lg text-xs font-semibold bg-white"
+                  />
+                </div>
+
+                {/* Kitufe Cha Kuanzisha Ukumbusho Otomatiki */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleWashaVikumbusho}
+                    className="w-full py-3 px-4 bg-[#D6145A] hover:bg-[#b00f48] text-white font-extrabold text-xs rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md active:scale-[0.99]"
+                  >
+                    <Bell className="w-4 h-4 animate-bounce" />
+                    Washa Vikumbusho Otomatiki vya Dawa (Hifadhi Ratiba kwenye Database)
+                  </button>
+                </div>
+
                 {reminderActive && (
-                  <div className="bg-emerald-50 border border-emerald-300 p-2.5 rounded-lg text-emerald-800 text-xs font-bold flex items-center justify-between gap-2">
+                  <div className="bg-emerald-50 border-2 border-emerald-400 p-3 rounded-lg text-emerald-900 text-xs font-bold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-xs">
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
                       <span>{reminderStatus || `Vikumbusho otomatiki vya dawa vimeamilishwa kwa siku ${reminderDays}.`}</span>
                     </div>
-                    <span className="bg-[#0F2D3E] text-white text-[10px] font-mono px-2 py-0.5 rounded font-bold">
-                      ACTIVE
+                    <span className="bg-[#0F2D3E] text-white text-[10px] font-mono px-2.5 py-1 rounded font-bold self-end sm:self-auto">
+                      ACTIVE & SAVED
                     </span>
                   </div>
                 )}
