@@ -193,20 +193,20 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
       activeList.forEach((reminder) => {
         const slots = [
-          { label: "Subhi (Asubuhi)", time: reminder.mudaAsubuhi || "08:00" },
-          { label: "Mchana", time: reminder.mudaMchana || "14:00" },
-          { label: "Jioni", time: reminder.mudaJioni || "20:00" }
+          { label: "Subhi (Asubuhi)", time: reminder.mudaAsubuhi },
+          { label: "Mchana", time: reminder.mudaMchana },
+          { label: "Jioni", time: reminder.mudaJioni }
         ];
 
         slots.forEach((slot) => {
-          if (!slot.time) return;
+          if (!slot.time || !slot.time.trim()) return;
           const slotMinutes = parseTimeToMinutes(slot.time);
           if (slotMinutes === null) return;
 
-          // Trigger when current clock time equals or reaches exact slot time (0 to 3 mins window)
-          // Difference must be >= 0 (never before scheduled time) and <= 3 (up to 3 mins window)
+          // Trigger STRICTLY when current clock time equals exact scheduled slot time (0 to 1 min window)
+          // Difference must be >= 0 (never before scheduled time) and <= 1 (exact minute)
           const minutesDiff = currentTotalMinutes - slotMinutes;
-          if (minutesDiff >= 0 && minutesDiff <= 3) {
+          if (minutesDiff >= 0 && minutesDiff <= 1) {
             const cleanTime = slot.time.trim();
             const dedupeKey = `${todayLocalDateStr}_${reminder.id}_${slot.label}_${cleanTime}`;
             if (!sentTodayKeys.has(dedupeKey)) {
