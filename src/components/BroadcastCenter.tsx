@@ -230,16 +230,14 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
           const slotMinutes = parseTimeToMinutes(slot.time);
           if (slotMinutes === null) return;
 
-          // Trigger STRICTLY when current clock time equals exact scheduled slot time (0 to 1 min window)
-          // Difference must be >= 0 (never before scheduled time) and <= 1 (exact minute)
-          const minutesDiff = currentTotalMinutes - slotMinutes;
-          if (minutesDiff >= 0 && minutesDiff <= 1) {
-            const cleanTime = slot.time.trim();
+          // Trigger STRICTLY when current clock HH:MM equals exact scheduled slot HH:MM
+          const slotFormattedHHMM = `${String(Math.floor(slotMinutes / 60)).padStart(2, "0")}:${String(slotMinutes % 60).padStart(2, "0")}`;
+          if (currentHHMM === slotFormattedHHMM) {
             const cleanPhone = (reminder.nambaSimu || "").replace(/[^\d]/g, "");
-            const dedupeKey = `${todayLocalDateStr}_${cleanPhone}_${slot.label}_${cleanTime}`;
+            const dedupeKey = `${todayLocalDateStr}_${cleanPhone}_${slot.label}_${slotFormattedHHMM}`;
             if (!sentTodayKeys.has(dedupeKey)) {
               markKeyAsSentToday(dedupeKey);
-              handleTriggerSingleReminderSMS(reminder, `âš¡ Auto-Cron (${slot.label})`, false);
+              handleTriggerSingleReminderSMS(reminder, `âš¡ Auto-Cron (${slot.label} @ ${slotFormattedHHMM})`, false);
             }
           }
         });
