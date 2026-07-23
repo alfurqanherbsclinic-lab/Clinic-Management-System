@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { Patient } from "../types";
 import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { db } from "../firebase";
 
 interface BroadcastCenterProps {
   patients: Patient[];
@@ -121,7 +121,30 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     return localStorage.getItem("oasis_auto_dispatcher") !== "false";
   });
   const [lastCronCheck, setLastCronCheck] = useState<string>("");
-  const [sentTodayKeys, setSentTodayKeys] = useState<Set<string>>(new Set());
+  const [sentTodayKeys, setSentTodayKeys] = useState<Set<string>>(() => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const stored = localStorage.getItem(`oasis_sent_keys_${today}`);
+      if (stored) return new Set(JSON.parse(stored));
+    } catch (e) {
+      console.error("Error loading sentTodayKeys:", e);
+    }
+    return new Set();
+  });
+
+  // Helper to persist sentTodayKeys
+  const markKeyAsSentToday = (key: string) => {
+    const today = new Date().toISOString().split("T")[0];
+    setSentTodayKeys((prev) => {
+      const updated = new Set(prev).add(key);
+      try {
+        localStorage.setItem(`oasis_sent_keys_${today}`, JSON.stringify(Array.from(updated)));
+      } catch (e) {
+        console.error("Error saving sentTodayKeys:", e);
+      }
+      return updated;
+    });
+  };
 
   // Auto save Auto-Dispatcher setting
   useEffect(() => {
@@ -180,12 +203,13 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
           const slotMinutes = parseTimeToMinutes(slot.time);
           if (slotMinutes === null) return;
 
-          // Trigger strictly when current time arrives at scheduled slot time (0 to 3 minutes window)
+          // Trigger STRICTLY when current clock time equals or reaches exact slot time (0 to 1 min window)
+          // Difference must be >= 0 (never before scheduled time) and <= 1 (exact minute)
           const minutesDiff = currentTotalMinutes - slotMinutes;
-          if (minutesDiff >= 0 && minutesDiff <= 3) {
+          if (minutesDiff >= 0 && minutesDiff <= 1) {
             const dedupeKey = `${todayLocalDateStr}_${reminder.id}_${slot.label}`;
             if (!sentTodayKeys.has(dedupeKey)) {
-              setSentTodayKeys((prev) => new Set(prev).add(dedupeKey));
+              markKeyAsSentToday(dedupeKey);
               handleTriggerSingleReminderSMS(reminder, `âš¡ Auto-Cron (${slot.label})`, false);
             }
           }
