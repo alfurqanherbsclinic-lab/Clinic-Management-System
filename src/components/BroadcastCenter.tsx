@@ -17,17 +17,46 @@ import {
   RefreshCw,
   Info,
   ShieldCheck,
-  Zap
+  Zap,
+  Bell,
+  Clock,
+  Cloud,
+  FileCode,
+  Pill,
+  CheckCheck
 } from "lucide-react";
 import { Patient } from "../types";
+import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { db } from "../firebase";
 
 interface BroadcastCenterProps {
   patients: Patient[];
 }
 
+interface FirebaseReminder {
+  id: string;
+  jinaMgonjwa: string;
+  nambaSimu: string;
+  dawaAlizopewa: string;
+  maraNgapiKwaSiku: string;
+  mudaAsubuhi: string;
+  mudaMchana: string;
+  mudaJioni: string;
+  sikuZaUkumbusho: number;
+  tareheYaKuanza: string;
+  tareheYaKumaliza: string;
+  maelezoYaZiada: string;
+  haliYaUkumbusho: string;
+  tareheIliyowashwa: string;
+  mudaWaMwishoKutuma?: string;
+}
+
 export function BroadcastCenter({ patients }: BroadcastCenterProps) {
-  // Target recipient mode: "bulk" (all patients), "single" (individual patient), or "manual" (custom daily phone numbers)
-  const [recipientMode, setRecipientMode] = useState<"bulk" | "single" | "manual">("bulk");
+  // Main view tab: "broadcast" (Bulk / Manual SMS) or "reminders" (Firebase Medication Reminders Engine)
+  const [activeTab, setActiveTab] = useState<"broadcast" | "reminders">("broadcast");
+
+  // Target recipient mode: "bulk" (all patients), "single" (individual patient), "manual" (custom daily phone numbers), or "reminders" (medication reminder patients)
+  const [recipientMode, setRecipientMode] = useState<"bulk" | "single" | "manual" | "reminders">("bulk");
   const [selectedPatientId, setSelectedPatientId] = useState<string>(
     patients.length > 0 ? patients[0].id : ""
   );
@@ -38,14 +67,18 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
   // Oasis Technologies API Credentials
   const [oasisApiKey, setOasisApiKey] = useState<string>(() => {
-    return localStorage.getItem("oasis_api_key") || "";
+    return localStorage.getItem("oasis_api_key") || "39029312930192310239120391203921";
   });
   const [oasisSenderId, setOasisSenderId] = useState<string>(() => {
     const saved = localStorage.getItem("oasis_sender_id");
     return (!saved || saved === "ALFURQAN") ? "AHC MKONONI" : saved;
   });
   const [oasisBaseUrl, setOasisBaseUrl] = useState<string>(() => {
-    return localStorage.getItem("oasis_base_url") || "https://bulksms.oasistech.co.tz/api/sms/send";
+    const saved = localStorage.getItem("oasis_base_url");
+    if (!saved || saved.includes("api.oasistech.co.tz/v1")) {
+      return "https://bulksms.oasistech.co.tz/api/sms";
+    }
+    return saved;
   });
   const [useCorsProxy, setUseCorsProxy] = useState<boolean>(() => {
     return localStorage.getItem("oasis_use_cors_proxy") !== "false";
@@ -77,6 +110,12 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copiedNumbers, setCopiedNumbers] = useState<boolean>(false);
 
+  // --- FIREBASE PATIENT REMINDERS STATES ---
+  const [firebaseReminders, setFirebaseReminders] = useState<FirebaseReminder[]>([]);
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
+  const [showCloudFunctionModal, setShowCloudFunctionModal] = useState<boolean>(false);
+  const [reminderDispatchLogs, setReminderDispatchLogs] = useState<{ id: string; name: string; phone: string; time: string; status: "success" | "failed"; detail: string }[]>([]);
+
   // Auto save Oasis credentials to localStorage
   useEffect(() => {
     localStorage.setItem("oasis_api_key", oasisApiKey);
@@ -84,6 +123,28 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     localStorage.setItem("oasis_base_url", oasisBaseUrl);
     localStorage.setItem("oasis_use_cors_proxy", String(useCorsProxy));
   }, [oasisApiKey, oasisSenderId, oasisBaseUrl, useCorsProxy]);
+
+  // Real-time listener for Firebase Firestore collection 'patient_reminders'
+  useEffect(() => {
+    try {
+      const unsubscribe = onSnapshot(
+        collection(db, "patient_reminders"),
+        (snapshot) => {
+          const list: FirebaseReminder[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push({ id: docSnap.id, ...docSnap.data() } as FirebaseReminder);
+          });
+          setFirebaseReminders(list);
+        },
+        (err) => {
+          console.error("Firestore patient_reminders error:", err);
+        }
+      );
+      return () => unsubscribe();
+    } catch (e) {
+      console.error("Firebase listener initialization failed:", e);
+    }
+  }, []);
 
   // Update selected patient if list changes and current selection is missing
   useEffect(() => {
@@ -106,6 +167,14 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     } else if (category.includes("Kumbukumbu za Uteuzi")) {
       setMessageBody(
         "Habari ndugu mgonjwa, huu ni ukumbusho wa mahudhurio yako katika kliniki yetu ya Al-Furqan Herbs. Tafadhali fika na kadi yako ya matibabu."
+      );
+    } else if (category.includes("Ukumbusho wa Dawa - Asubuhi")) {
+      setMessageBody(
+        "Assalam Alaykum / Habari Ndg {JINA}, huu ni ukumbusho wa Al-Furqan Herbs Clinic wa kunywa dawa zako za ASUPUHI kwa wakati na maji ya kutosha. Afya bora ni mtaji wako!"
+      );
+    } else if (category.includes("Ukumbusho wa Dawa - Mchana/Jioni")) {
+      setMessageBody(
+        "Assalam Alaykum / Habari Ndg {JINA}, huu ni ukumbusho wa Al-Furqan Herbs Clinic wa kunywa dawa yako ya MCHANA / JIONI. Kula chakula na kunywa dawa kwa wakati kulingana na ushauri wa daktari."
       );
     } else if (category.includes("Ujumbe Maalum")) {
       setMessageBody("");
@@ -170,8 +239,96 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     }
   };
 
-  // Get active target list based on single/bulk/manual selection
+  // Trigger Instant Medication Reminder SMS via Oasis API
+  const handleTriggerSingleReminderSMS = async (reminder: FirebaseReminder, slotLabel: string = "Asubuhi") => {
+    setSendingReminderId(reminder.id);
+    const recipientPhone = formatTanzaniaPhone(reminder.nambaSimu);
+    const sender = oasisSenderId.trim() || "AHC MKONONI";
+
+    const customMessage = `Assalam Alaykum / Habari Ndg ${reminder.jinaMgonjwa}, huu ni ukumbusho wa Al-Furqan Herbs Clinic wa kunywa dawa zako: ${reminder.dawaAlizopewa}. Maelezo: ${reminder.maelezoYaZiada || "Kunywa kwa wakati na maji ya kutosha"}. Awamu: ${slotLabel}. Afya bora ni mtaji wako!`;
+
+    try {
+      const response = await fetch("/api/sms/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          apiKey: oasisApiKey.trim(),
+          sender_id: sender,
+          recipient: recipientPhone,
+          message: customMessage,
+          baseUrl: oasisBaseUrl.trim()
+        })
+      });
+
+      const rawText = await response.text();
+      let parsedJson: any = {};
+      try { parsedJson = JSON.parse(rawText); } catch {}
+
+      const isSuccess = response.ok;
+      const detailMsg = isSuccess
+        ? `Ujumbe umetumwa Oasis kwa mafanikio (${recipientPhone})`
+        : extractErrorMessage(parsedJson, `HTTP ${response.status} Error`);
+
+      const logEntry = {
+        id: `${reminder.id}-${Date.now()}`,
+        name: reminder.jinaMgonjwa,
+        phone: reminder.nambaSimu,
+        time: new Date().toLocaleTimeString(),
+        status: isSuccess ? ("success" as const) : ("failed" as const),
+        detail: detailMsg
+      };
+
+      setReminderDispatchLogs(prev => [logEntry, ...prev]);
+
+      // Update Firestore document with timestamp of last sent SMS
+      try {
+        await updateDoc(doc(db, "patient_reminders", reminder.id), {
+          mudaWaMwishoKutuma: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error("Failed to update timestamp in Firestore:", err);
+      }
+
+      if (isSuccess) {
+        alert(`âœ… Imefanikiwa! Ukumbusho wa SMS (${slotLabel}) umetumwa kwa ${reminder.jinaMgonjwa} (${recipientPhone}) kupitia Oasis SMS Gateway.`);
+      } else {
+        alert(`âŒ Imeshindikana kutuma SMS kwa ${reminder.jinaMgonjwa}: ${detailMsg}`);
+      }
+    } catch (err: any) {
+      alert(`Hitilafu ya mtandao: ${err.message}`);
+    } finally {
+      setSendingReminderId(null);
+    }
+  };
+
+  // Toggle Reminder Active/Inactive Status in Firestore
+  const handleToggleReminderStatus = async (reminder: FirebaseReminder) => {
+    const newStatus = reminder.haliYaUkumbusho === "HAI" ? "IMESITISHWA" : "HAI";
+    try {
+      await updateDoc(doc(db, "patient_reminders", reminder.id), {
+        haliYaUkumbusho: newStatus
+      });
+      alert(`Hali ya ukumbusho ya ${reminder.jinaMgonjwa} imebadilishwa kuwa: ${newStatus}`);
+    } catch (err: any) {
+      alert("Hitilafu katika kubadilisha hali: " + err.message);
+    }
+  };
+
+  // Get active target list based on single/bulk/manual/reminders selection
   const getTargetPatients = (): { id: string; name: string; phone: string; cardNumber: string }[] => {
+    if (recipientMode === "reminders") {
+      return firebaseReminders
+        .filter((r) => r.haliYaUkumbusho === "HAI")
+        .map((r, idx) => ({
+          id: r.id || `rem-${idx}`,
+          name: r.jinaMgonjwa,
+          phone: r.nambaSimu,
+          cardNumber: `Dawa: ${r.dawaAlizopewa}`
+        }));
+    }
     if (recipientMode === "single") {
       const p = patients.find((item) => item.id === selectedPatientId);
       return p ? [p] : [];
@@ -225,19 +382,19 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     const sender = oasisSenderId.trim() || "AHC MKONONI";
     const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
 
-        try {
-      const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-      const resp = await fetch(publicProxyUrl, {
+    try {
+      const resp = await fetch("/api/sms/send", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${oasisApiKey.trim()}`,
           "Accept": "application/json"
         },
         body: JSON.stringify({
-          from: sender,
-          to: [testPhone],
-          text: "Jaribio la muunganiko wa mfumo wa Al-Furqan Herbs Clinic na Oasis SMS Gateway."
+          apiKey: oasisApiKey.trim(),
+          sender_id: sender,
+          recipient: testPhone,
+          message: "Jaribio la muunganiko wa mfumo wa Al-Furqan Herbs Clinic na Oasis SMS Gateway.",
+          baseUrl: targetUrl
         })
       });
 
@@ -313,92 +470,103 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
       let isSuccess = false;
       let responseDetails = "";
 
+      try {
+        let response: Response | null = null;
+        const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
+        const payload = {
+          sender_id: sender,
+          recipient: recipientPhone,
+          message: textToDeliver
+        };
+
+        if (useCorsProxy) {
+          // Attempt 1: Try local server proxy (/api/sms/send)
           try {
-      const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-      
-      const resp = await fetch(publicProxyUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${oasisApiKey.trim()}`,
-          "Accept": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
+            const proxyResp = await fetch("/api/sms/send", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+              },
+              body: JSON.stringify({
+                apiKey: oasisApiKey.trim(),
+                sender_id: sender,
+                recipient: recipientPhone,
+                message: textToDeliver,
+                baseUrl: targetUrl
+              })
+            });
 
-      const rawText = await resp.text();
-      let parsedJson: any = null;
-      try {
-        parsedJson = JSON.parse(rawText);
-      } catch {}
+            if (proxyResp.status !== 404 && proxyResp.status !== 405) {
+              response = proxyResp;
+            }
+          } catch (pErr) {
+            // Local proxy endpoint not available
+          }
 
-      if (resp.ok) {
-        isSuccess = true;
-        responseDetails = `Ujumbe umewasilishwa Oasis kwa mafanikio (${recipientPhone})`;
-      } else {
-        isSuccess = false;
-        responseDetails = `HTTP ${resp.status}: ${extractErrorMessage(parsedJson, rawText)}`;
+          // Attempt 2: If local server proxy missing (e.g. static hosting on Vercel), try Public CORS proxy
+          if (!response) {
+            try {
+              const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+              response = await fetch(publicProxyUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${oasisApiKey.trim()}`,
+                  "Accept": "application/json"
+                },
+                body: JSON.stringify(payload)
+              });
+            } catch (pubErr) {
+              // Public proxy failed, will try direct fetch
+            }
+          }
+        }
+
+        // Attempt 3: Direct fetch fallback if no proxy response was received
+        if (!response) {
+          response = await fetch(targetUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${oasisApiKey.trim()}`,
+              "Accept": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+        }
+
+        if (response.ok) {
+          const data = await response.json().catch(() => ({}));
+          isSuccess = true;
+          const msg = extractErrorMessage(data, `Ujumbe umewasilishwa Oasis kwa mafanikio (${recipientPhone})`);
+          responseDetails = `HTTP ${response.status}: ${msg}`;
+        } else {
+          let errData: any = {};
+          const contentType = response.headers.get("content-type") || "";
+          if (contentType.includes("application/json")) {
+            errData = await response.json().catch(() => ({}));
+          } else {
+            const txt = await response.text().catch(() => "");
+            errData = txt;
+          }
+
+          const cleanMsg = extractErrorMessage(errData, `HTTP ${response.status} kutoka Oasis Gateway`);
+          isSuccess = false;
+          responseDetails = `Hitilafu ya Oasis (HTTP ${response.status}): ${cleanMsg}`;
+        }
+      } catch (err: unknown) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        const isCorsError = errMsg.toLowerCase().includes("failed to fetch") || errMsg.toLowerCase().includes("networkerror");
+        
+        if (isCorsError) {
+          isSuccess = false;
+          responseDetails = `Kizuizi cha Kivinjari (CORS Error): Server ya Oasis inakataa maombi ya moja kwa moja. Mfumo unatumia Server Proxy kurekebisha hili.`;
+        } else {
+          isSuccess = false;
+          responseDetails = `Hitilafu ya Mtandao: ${errMsg}`;
+        }
       }
-    } catch (err: unknown) {
-      isSuccess = false;
-      const errStr = err instanceof Error ? err.message : String(err);
-      responseDetails = `Hitilafu ya mtandao: ${errStr}`;
-    }
-
-
-
-                            const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
-    
-    const payload = {
-      from: sender,
-      to: [recipientPhone],
-      text: textToDeliver
-    };
-
-    // Tumia moja kwa moja bila kuweka neno "let" tena hapa
-    isSuccess = false;
-    responseDetails = "";
-
-        try {
-      // Tunatuma ombi kwenda kwenye API yetu ya ndani ya Vercel (/api/sms/send)
-      const resp = await fetch("/api/sms/send", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({
-          apiKey: oasisApiKey.trim(),
-          from: sender,
-          to: [recipientPhone],
-          text: textToDeliver,
-          baseUrl: oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send"
-        })
-      });
-
-      const rawText = await resp.text();
-      let parsedJson: any = null; // Hapa badilisha kutoka nil iwe null
-      try {
-        parsedJson = JSON.parse(rawText);
-      } catch {}
-
-      if (resp.ok) {
-        isSuccess = true;
-        responseDetails = `Ujumbe umewasilishwa Oasis kwa mafanikio (${recipientPhone})`;
-      } else {
-        isSuccess = false;
-        responseDetails = `HTTP ${resp.status}: ${extractErrorMessage(parsedJson, rawText)}`;
-      }
-    } catch (err: unknown) {
-      isSuccess = false;
-      const errStr = err instanceof Error ? err.message : String(err);
-      responseDetails = `Hitilafu ya mtandao: ${errStr}`;
-    }
-
-
-
-
-
 
       const logItem = {
         name: patient.name,
@@ -553,6 +721,17 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
+                  onClick={() => setOasisBaseUrl("https://bulksms.oasistech.co.tz/api/sms")}
+                  className={`px-2.5 py-1 rounded text-[11px] font-mono font-bold border transition-colors cursor-pointer ${
+                    oasisBaseUrl === "https://bulksms.oasistech.co.tz/api/sms"
+                      ? "bg-primary text-white border-primary"
+                      : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
+                  }`}
+                >
+                  bulksms.oasistech.co.tz (/api/sms)
+                </button>
+                <button
+                  type="button"
                   onClick={() => setOasisBaseUrl("https://api.oasistech.co.tz/v1/sms/send")}
                   className={`px-2.5 py-1 rounded text-[11px] font-mono font-bold border transition-colors cursor-pointer ${
                     oasisBaseUrl === "https://api.oasistech.co.tz/v1/sms/send"
@@ -561,17 +740,6 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
                   }`}
                 >
                   api.oasistech.co.tz (v1/sms/send)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOasisBaseUrl("https://bulksms.oasistech.co.tz/api/sms/send")}
-                  className={`px-2.5 py-1 rounded text-[11px] font-mono font-bold border transition-colors cursor-pointer ${
-                    oasisBaseUrl === "https://bulksms.oasistech.co.tz/api/sms/send"
-                      ? "bg-primary text-white border-primary"
-                      : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
-                  }`}
-                >
-                  bulksms.oasistech.co.tz (Dashboard)
                 </button>
               </div>
               <input
@@ -662,8 +830,43 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
         </div>
       )}
 
-      {/* Main Broadcast Control Area */}
-      <div className="p-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
+      {/* Sub Navigation Bar: Bulk Broadcast vs Patient Medication Reminders */}
+      <div className="bg-emerald-950 p-2.5 flex flex-col sm:flex-row border-b border-emerald-800 gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("broadcast")}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+            activeTab === "broadcast"
+              ? "bg-amber-400 text-emerald-950 shadow-md"
+              : "bg-emerald-900/60 text-emerald-200 hover:bg-emerald-900"
+          }`}
+        >
+          <Send className="w-4 h-4" />
+          <span>BROADCAST CENTER (SMS NA WHATSAPP)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("reminders")}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer relative ${
+            activeTab === "reminders"
+              ? "bg-amber-400 text-emerald-950 shadow-md"
+              : "bg-emerald-900/60 text-emerald-200 hover:bg-emerald-900"
+          }`}
+        >
+          <Bell className="w-4 h-4" />
+          <span>RATIBA ZA UKUMBUSHO WA DAWA (FIREBASE ENGINE)</span>
+          {firebaseReminders.length > 0 && (
+            <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full ml-1">
+              {firebaseReminders.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* TAB 1: BULK BROADCAST & DIRECT MESSAGING */}
+      {activeTab === "broadcast" && (
+        <div className="p-6 grid grid-cols-1 xl:grid-cols-3 gap-6">
         
         {/* Left 2 Columns: Form Controls */}
         <div className="xl:col-span-2 space-y-5">
@@ -673,7 +876,7 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
             <label className="text-xs font-extrabold text-primary uppercase tracking-wider block">
               CHAGUA WALENGWA (RECIPIENT TARGET)
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Option 1: All Registered Patients */}
               <button
                 type="button"
@@ -738,6 +941,31 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
                   </div>
                 </div>
                 {recipientMode === "manual" && <CheckCircle2 className="w-4 h-4 text-secondary flex-shrink-0" />}
+              </button>
+
+              {/* Option 4: Medication Reminders (Firebase Engine) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setRecipientMode("reminders");
+                  setActiveTab("reminders");
+                }}
+                className={`p-3 rounded-xl border-2 font-bold text-xs flex items-center justify-between transition-all cursor-pointer ${
+                  recipientMode === "reminders" || activeTab === "reminders"
+                    ? "bg-amber-500 text-emerald-950 border-amber-600 shadow-md"
+                    : "bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 flex-shrink-0 text-emerald-950" />
+                  <div className="text-left">
+                    <p className="font-extrabold">Ukumbusho wa Dawa</p>
+                    <p className="text-[10px] text-emerald-950 font-bold">
+                      Firebase Sync ({firebaseReminders.length})
+                    </p>
+                  </div>
+                </div>
+                <CheckCircle2 className="w-4 h-4 text-emerald-950 flex-shrink-0" />
               </button>
             </div>
 
@@ -868,6 +1096,12 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
             >
               <option value="Dokezo la Matoleo Mapya (Stoki ya Dawa imewasili)">
                 Dokezo la Matoleo Mapya (Stoki ya Dawa imewasili)
+              </option>
+              <option value="Ukumbusho wa Dawa - Asubuhi">
+                ðŸ’Š Ukumbusho wa Kunywa Dawa - Asubuhi
+              </option>
+              <option value="Ukumbusho wa Dawa - Mchana/Jioni">
+                ðŸŒ™ Ukumbusho wa Kunywa Dawa - Mchana / Jioni
               </option>
               <option value="Elimu ya Afya na Tiba ya Sunnah (Al-Furqan Clinic)">
                 Elimu ya Afya na Tiba ya Sunnah (Al-Furqan Clinic)
@@ -1163,6 +1397,267 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
         </div>
 
       </div>
+      )}
+
+      {/* TAB 2: FIREBASE PATIENT MEDICATION REMINDERS DISPATCHER */}
+      {activeTab === "reminders" && (
+        <div className="p-6 space-y-6 animate-fadeIn">
+          {/* Top Banner Info */}
+          <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white p-5 rounded-2xl border-2 border-emerald-700 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Cloud className="w-5 h-5 text-amber-400" />
+                <h3 className="font-black text-sm sm:text-base font-display text-amber-300 uppercase tracking-wide">
+                  UTUMAJI WA UKUMBUSHO WA DAWA (FIREBASE FIRESTORE SYNC)
+                </h3>
+              </div>
+              <p className="text-xs text-emerald-100 max-w-2xl leading-relaxed">
+                Hapa ni orodha ya ratiba zote za ukumbusho wa dawa zilizohifadhiwa Firebase kutoka kwenye ukurasa wa <strong>Orodha ya Wagonjwa</strong>.
+                Unaweza kutuma ujumbe wa ukumbusho wa papo hapo kwa kila mgonjwa kupitia Oasis SMS Gateway, au kuweka utumaji wa kiotomatiki wa kila siku (Firebase Cloud Function / Cron Job).
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowCloudFunctionModal(true)}
+              className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-emerald-950 font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer flex-shrink-0"
+            >
+              <FileCode className="w-4 h-4" />
+              <span>Soma Code ya Utumaji wa Kiotomatiki (Cloud Function)</span>
+            </button>
+          </div>
+
+          {/* List of Firebase Reminders */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+              <div className="flex items-center gap-2">
+                <Bell className="w-5 h-5 text-emerald-700" />
+                <h4 className="font-extrabold text-sm text-primary uppercase tracking-wider">
+                  RATIBA ZOTE ZILIZOPO FIREBASE ({firebaseReminders.length})
+                </h4>
+              </div>
+              <span className="text-xs font-semibold text-gray-500">
+                Inasasishwa kiotomatiki (Real-time Firestore)
+              </span>
+            </div>
+
+            {firebaseReminders.length === 0 ? (
+              <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center space-y-3">
+                <Pill className="w-12 h-12 text-slate-400 mx-auto" />
+                <h5 className="font-extrabold text-primary text-sm">Hakuna Ratiba za Ukumbusho Bado</h5>
+                <p className="text-xs text-gray-500 max-w-md mx-auto">
+                  Ili kutengeneza ukumbusho mpya, nenda kwenye ukurasa wa <strong>Orodha ya Wagonjwa</strong>, chagua mgonjwa, kisha bonyeza kitufe cha <strong>"Kumbusha Dawa (Set Reminder)"</strong> na ujaze fomu.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {firebaseReminders.map((reminder) => {
+                  const isSendingThis = sendingReminderId === reminder.id;
+                  const isNoteActive = reminder.haliYaUkumbusho === "HAI";
+
+                  return (
+                    <div
+                      key={reminder.id}
+                      className={`bg-white rounded-2xl border-2 p-4 space-y-3 transition-all shadow-sm ${
+                        isNoteActive
+                          ? "border-emerald-200 hover:border-emerald-400"
+                          : "border-gray-200 bg-gray-50/70 opacity-75"
+                      }`}
+                    >
+                      {/* Header */}
+                      <div className="flex items-start justify-between border-b border-gray-100 pb-2.5">
+                        <div>
+                          <h5 className="font-extrabold text-sm text-primary flex items-center gap-1.5">
+                            <User className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                            <span>{reminder.jinaMgonjwa}</span>
+                          </h5>
+                          <p className="text-xs text-gray-600 font-mono font-bold mt-0.5">
+                            ðŸ“ž {reminder.nambaSimu}
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() => handleToggleReminderStatus(reminder)}
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border cursor-pointer transition-colors ${
+                            isNoteActive
+                              ? "bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200"
+                              : "bg-gray-200 text-gray-700 border-gray-300 hover:bg-gray-300"
+                          }`}
+                        >
+                          {isNoteActive ? "HAI (ACTIVE)" : "IMESITISHWA"}
+                        </button>
+                      </div>
+
+                      {/* Details */}
+                      <div className="space-y-1.5 text-xs text-gray-700">
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 font-medium">
+                          <span className="font-bold text-primary block text-[11px] uppercase tracking-wider mb-0.5">ðŸ’Š Dawa Alizopewa:</span>
+                          <span className="text-emerald-950 font-semibold">{reminder.dawaAlizopewa || "Haikutajwa"}</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                          <div className="bg-amber-50 p-2 rounded-lg border border-amber-200">
+                            <span className="font-bold text-amber-900 block">Mara kwa siku:</span>
+                            <span className="font-black text-amber-950">{reminder.maraNgapiKwaSiku || "Kila Siku"}</span>
+                          </div>
+
+                          <div className="bg-sky-50 p-2 rounded-lg border border-sky-200">
+                            <span className="font-bold text-sky-900 block">Siku za matumizi:</span>
+                            <span className="font-black text-sky-950">{reminder.sikuZaUkumbusho || 7} Siku</span>
+                          </div>
+                        </div>
+
+                        {/* Timeslots */}
+                        <div className="flex items-center justify-between text-[11px] bg-slate-100 p-2 rounded-lg text-slate-700 font-medium">
+                          <span>â° Asubuhi: <strong>{reminder.mudaAsubuhi || "--:--"}</strong></span>
+                          <span>Mchana: <strong>{reminder.mudaMchana || "--:--"}</strong></span>
+                          <span>Jioni: <strong>{reminder.mudaJioni || "--:--"}</strong></span>
+                        </div>
+
+                        {reminder.mudaWaMwishoKutuma && (
+                          <div className="text-[10px] text-gray-500 flex items-center gap-1 font-mono pt-1">
+                            <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Mwisho Kutumwa SMS: {new Date(reminder.mudaWaMwishoKutuma).toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Trigger SMS */}
+                      <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-gray-500 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Tuma Papo Hapo:</span>
+                        </span>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            disabled={isSendingThis}
+                            onClick={() => handleTriggerSingleReminderSMS(reminder, "Asubuhi")}
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] shadow-sm cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1"
+                          >
+                            {isSendingThis ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                            <span>SMS Subhi</span>
+                          </button>
+
+                          <button
+                            disabled={isSendingThis}
+                            onClick={() => handleTriggerSingleReminderSMS(reminder, "Mchana/Jioni")}
+                            className="px-2.5 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg text-[11px] shadow-sm cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1"
+                          >
+                            {isSendingThis ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                            <span>SMS Jioni</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Dispatch Logs */}
+          {reminderDispatchLogs.length > 0 && (
+            <div className="bg-slate-900 text-slate-100 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <h5 className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span>KUMBUKUMBU YA UTUMAJI WA UKUMBUSHO (DISPATCH LOGS)</span>
+              </h5>
+              <div className="max-h-48 overflow-y-auto space-y-2 text-xs font-mono">
+                {reminderDispatchLogs.map((log) => (
+                  <div key={log.id} className="p-2 rounded bg-slate-800/80 border border-slate-700 flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-white">{log.name}</span> ({log.phone}) - <span className="text-amber-300">{log.time}</span>
+                      <p className="text-[11px] text-slate-300">{log.detail}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.status === "success" ? "bg-emerald-900 text-emerald-200" : "bg-rose-900 text-rose-200"}`}>
+                      {log.status.toUpperCase()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CLOUD FUNCTION / CRON JOB GUIDE MODAL */}
+      {showCloudFunctionModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl border-2 border-emerald-600 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+              <div className="flex items-center gap-2">
+                <Zap className="w-6 h-6 text-amber-500" />
+                <h3 className="font-black text-base text-primary uppercase">
+                  Jinsi ya Kuweka Utumaji wa Kiotomatiki (Cron / Cloud Function)
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowCloudFunctionModal(false)}
+                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 cursor-pointer font-bold text-lg"
+              >
+                âœ•
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-gray-700 leading-relaxed">
+              <p>
+                Ili ujumbe wa ukumbusho wa dawa uwe unajituma kiotomatiki <strong>kila siku asubuhi, mchana, na jioni bila wewe kubonyeza kitufe</strong>, unahitaji kuweka <strong>Firebase Cloud Function Scheduled Cron Job</strong>.
+              </p>
+
+              <div className="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-[11px] overflow-x-auto space-y-2">
+                <span className="text-amber-400 font-bold block">// Code ya Firebase Cloud Function (index.js):</span>
+                <pre className="text-[11px] font-mono text-emerald-300 leading-relaxed">{`const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+const axios = require("axios");
+
+admin.initializeApp();
+
+exports.scheduledMedicationReminder = functions.pubsub
+  .schedule("0 8,14,20 * * *")
+  .timeZone("Africa/Dar_es_Salaam")
+  .onRun(async (context) => {
+    const db = admin.firestore();
+    const snapshot = await db.collection("patient_reminders")
+      .where("haliYaUkumbusho", "==", "HAI")
+      .get();
+
+    snapshot.forEach(async (docSnap) => {
+      const r = docSnap.data();
+      const msg = "Habari " + r.jinaMgonjwa + ", huu ni ukumbusho wa Al-Furqan Herbs Clinic wa kunywa dawa: " + r.dawaAlizopewa;
+      
+      await axios.post("https://bulksms.oasistech.co.tz/api/sms/send", {
+        api_key: "YOUR_OASIS_API_KEY",
+        service_id: 0,
+        sender_id: "AHC MKONONI",
+        mobile: r.nambaSimu,
+        sms: msg
+      });
+    });
+  });`}</pre>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-300 p-3 rounded-xl space-y-1 text-amber-900 font-medium">
+                <span className="font-extrabold flex items-center gap-1">
+                  <Info className="w-4 h-4 text-amber-600" />
+                  <span>Njia Rahisi Basi za Kila Siku (Kutoka kwenye Mfumo):</span>
+                </span>
+                <p>
+                  Kwa sasa, ukiwa kwenye mfumo huu, unaweza pia kutumia vitufe vya <strong>"SMS Subhi"</strong> na <strong>"SMS Jioni"</strong> kwenye orodha iliyopo hapo juu ili kutuma ukumbusho papo hapo kupitia Oasis SMS Gateway.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setShowCloudFunctionModal(false)}
+                className="px-5 py-2.5 bg-primary hover:bg-emerald-900 text-white font-extrabold text-xs rounded-xl shadow cursor-pointer"
+              >
+                Nimeelewa (Funga)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
