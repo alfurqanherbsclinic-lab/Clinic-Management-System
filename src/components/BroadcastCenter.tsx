@@ -203,11 +203,12 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
           const slotMinutes = parseTimeToMinutes(slot.time);
           if (slotMinutes === null) return;
 
-          // Trigger STRICTLY when current clock time equals or reaches exact slot time (0 to 1 min window)
-          // Difference must be >= 0 (never before scheduled time) and <= 1 (exact minute)
+          // Trigger when current clock time equals or reaches exact slot time (0 to 3 mins window)
+          // Difference must be >= 0 (never before scheduled time) and <= 3 (up to 3 mins window)
           const minutesDiff = currentTotalMinutes - slotMinutes;
-          if (minutesDiff >= 0 && minutesDiff <= 1) {
-            const dedupeKey = `${todayLocalDateStr}_${reminder.id}_${slot.label}`;
+          if (minutesDiff >= 0 && minutesDiff <= 3) {
+            const cleanTime = slot.time.trim();
+            const dedupeKey = `${todayLocalDateStr}_${reminder.id}_${slot.label}_${cleanTime}`;
             if (!sentTodayKeys.has(dedupeKey)) {
               markKeyAsSentToday(dedupeKey);
               handleTriggerSingleReminderSMS(reminder, `âš¡ Auto-Cron (${slot.label})`, false);
@@ -1613,24 +1614,37 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
                 </span>
               </div>
 
-              {/* Quick Batch Actions */}
+              {/* Quick Batch Actions & Memory Reset */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-extrabold text-emerald-950 uppercase tracking-wider hidden sm:inline">
-                  Tuma Vyote Sasa (Batch):
+                <button
+                  onClick={() => {
+                    const today = new Date().toISOString().split("T")[0];
+                    localStorage.removeItem(`oasis_sent_keys_${today}`);
+                    setSentTodayKeys(new Set());
+                    alert("âœ… Kumbukumbu za utumaji wa kiotomatiki za leo zimesafishwa! Sasa unaweza kujaribu mabadiliko ya muda tena.");
+                  }}
+                  title="Futa kumbukumbu za utumaji wa kiotomatiki za leo ili uweze kujaribu tena muda mpya"
+                  className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-xs transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Safisha Memory ya Leo</span>
+                </button>
+                <span className="text-[11px] font-extrabold text-emerald-950 uppercase tracking-wider hidden sm:inline ml-1">
+                  Batch:
                 </span>
                 <button
                   onClick={() => handleBatchSendAllActiveReminders("Subhi (Asubuhi)")}
                   className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs rounded-lg shadow-xs transition-all cursor-pointer flex items-center gap-1"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>Tuma Subhi Yote</span>
+                  <span>Subhi Yote</span>
                 </button>
                 <button
                   onClick={() => handleBatchSendAllActiveReminders("Mchana / Jioni")}
                   className="px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white font-black text-xs rounded-lg shadow-xs transition-all cursor-pointer flex items-center gap-1"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>Tuma Jioni Yote</span>
+                  <span>Jioni Yote</span>
                 </button>
               </div>
             </div>
