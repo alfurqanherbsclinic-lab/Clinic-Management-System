@@ -248,20 +248,14 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     const customMessage = `Assalam Alaykum / Habari Ndg ${reminder.jinaMgonjwa}, huu ni ukumbusho wa Al-Furqan Herbs Clinic wa kunywa dawa zako: ${reminder.dawaAlizopewa}. Maelezo: ${reminder.maelezoYaZiada || "Kunywa kwa wakati na maji ya kutosha"}. Awamu: ${slotLabel}. Afya bora ni mtaji wako!`;
 
     try {
-      const response = await fetch("/api/sms/send", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({
-          apiKey: oasisApiKey.trim(),
-          sender_id: sender,
-          recipient: recipientPhone,
-          message: customMessage,
-          baseUrl: oasisBaseUrl.trim()
-        })
-      });
+      const targetUrl = oasisBaseUrl.trim() || "https://bulksms.oasistech.co.tz/api/sms/send";
+      const response = await executeOasisSmsRequest(
+        targetUrl,
+        oasisApiKey,
+        sender,
+        recipientPhone,
+        customMessage
+      );
 
       const rawText = await response.text();
       let parsedJson: any = {};
@@ -366,6 +360,88 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
     window.open(waUrl, "_blank", "noopener,noreferrer");
   };
 
+  // Helper function to execute Oasis API requests with CORS proxy and direct fallback
+  const executeOasisSmsRequest = async (
+    targetUrl: string,
+    apiKey: string,
+    senderId: string,
+    recipientPhone: string,
+    messageText: string
+  ): Promise<Response> => {
+    const payload = {
+      sender_id: senderId,
+      recipient: recipientPhone,
+      message: messageText,
+      from: senderId,
+      to: [recipientPhone],
+      mobile: recipientPhone,
+      text: messageText,
+      api_key: apiKey.trim(),
+      apiKey: apiKey.trim()
+    };
+
+    let response: Response | null = null;
+
+    if (useCorsProxy) {
+      // 1. Try public CORS proxy 1 (corsproxy.io)
+      try {
+        const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+        const res = await fetch(corsProxyUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey.trim()}`,
+            "Accept": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("text/html")) {
+          response = res;
+        }
+      } catch (e) {
+        // corsproxy failed
+      }
+
+      // 2. Try public CORS proxy 2 (allorigins)
+      if (!response) {
+        try {
+          const allOriginsUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+          const res = await fetch(allOriginsUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${apiKey.trim()}`,
+              "Accept": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+          const contentType = res.headers.get("content-type") || "";
+          if (!contentType.includes("text/html")) {
+            response = res;
+          }
+        } catch (e) {
+          // allorigins failed
+        }
+      }
+    }
+
+    // 3. Fallback to Direct Fetch
+    if (!response) {
+      response = await fetch(targetUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey.trim()}`,
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    return response;
+  };
+
   // Test Connection with Oasis API
   const handleTestOasisConnection = async () => {
     if (!oasisApiKey.trim()) {
@@ -380,23 +456,16 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
 
     const testPhone = "255712000000";
     const sender = oasisSenderId.trim() || "AHC MKONONI";
-    const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
+    const targetUrl = oasisBaseUrl.trim() || "https://bulksms.oasistech.co.tz/api/sms/send";
 
     try {
-      const resp = await fetch("/api/sms/send", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify({
-          apiKey: oasisApiKey.trim(),
-          sender_id: sender,
-          recipient: testPhone,
-          message: "Jaribio la muunganiko wa mfumo wa Al-Furqan Herbs Clinic na Oasis SMS Gateway.",
-          baseUrl: targetUrl
-        })
-      });
+      const resp = await executeOasisSmsRequest(
+        targetUrl,
+        oasisApiKey,
+        sender,
+        testPhone,
+        "Jaribio la muunganiko wa mfumo wa Al-Furqan Herbs Clinic na Oasis SMS Gateway."
+      );
 
       const rawText = await resp.text();
       let parsedJson: any = null;
@@ -464,108 +533,43 @@ export function BroadcastCenter({ patients }: BroadcastCenterProps) {
       const recipientPhone = formatTanzaniaPhone(patient.phone);
       const textToDeliver = messageBody.replace(/\{JINA\}/g, patient.name).replace(/\{CARD_NO\}/g, patient.cardNumber);
 
-      // Simulate network request delay for realistic UI feedback
+      // Delay between SMS dispatches
       await new Promise((res) => setTimeout(res, 500));
 
       let isSuccess = false;
       let responseDetails = "";
 
       try {
-        let response: Response | null = null;
-        const targetUrl = oasisBaseUrl.trim() || "https://api.oasistech.co.tz/v1/sms/send";
-        const payload = {
-          sender_id: sender,
-          recipient: recipientPhone,
-          message: textToDeliver
-        };
+        const targetUrl = oasisBaseUrl.trim() || "https://bulksms.oasistech.co.tz/api/sms/send";
+        const response = await executeOasisSmsRequest(
+          targetUrl,
+          oasisApiKey,
+          sender,
+          recipientPhone,
+          textToDeliver
+        );
 
-        if (useCorsProxy) {
-          // Attempt 1: Try local server proxy (/api/sms/send)
-          try {
-            const proxyResp = await fetch("/api/sms/send", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-              },
-              body: JSON.stringify({
-                apiKey: oasisApiKey.trim(),
-                sender_id: sender,
-                recipient: recipientPhone,
-                message: textToDeliver,
-                baseUrl: targetUrl
-              })
-            });
-
-            if (proxyResp.status !== 404 && proxyResp.status !== 405) {
-              response = proxyResp;
-            }
-          } catch (pErr) {
-            // Local proxy endpoint not available
-          }
-
-          // Attempt 2: If local server proxy missing (e.g. static hosting on Vercel), try Public CORS proxy
-          if (!response) {
-            try {
-              const publicProxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-              response = await fetch(publicProxyUrl, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${oasisApiKey.trim()}`,
-                  "Accept": "application/json"
-                },
-                body: JSON.stringify(payload)
-              });
-            } catch (pubErr) {
-              // Public proxy failed, will try direct fetch
-            }
-          }
-        }
-
-        // Attempt 3: Direct fetch fallback if no proxy response was received
-        if (!response) {
-          response = await fetch(targetUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${oasisApiKey.trim()}`,
-              "Accept": "application/json"
-            },
-            body: JSON.stringify(payload)
-          });
+        const rawText = await response.text();
+        let parsedData: any = {};
+        try {
+          parsedData = JSON.parse(rawText);
+        } catch {
+          parsedData = rawText;
         }
 
         if (response.ok) {
-          const data = await response.json().catch(() => ({}));
           isSuccess = true;
-          const msg = extractErrorMessage(data, `Ujumbe umewasilishwa Oasis kwa mafanikio (${recipientPhone})`);
+          const msg = extractErrorMessage(parsedData, `Ujumbe umewasilishwa Oasis kwa mafanikio (${recipientPhone})`);
           responseDetails = `HTTP ${response.status}: ${msg}`;
         } else {
-          let errData: any = {};
-          const contentType = response.headers.get("content-type") || "";
-          if (contentType.includes("application/json")) {
-            errData = await response.json().catch(() => ({}));
-          } else {
-            const txt = await response.text().catch(() => "");
-            errData = txt;
-          }
-
-          const cleanMsg = extractErrorMessage(errData, `HTTP ${response.status} kutoka Oasis Gateway`);
           isSuccess = false;
+          const cleanMsg = extractErrorMessage(parsedData, `HTTP ${response.status} kutoka Oasis Gateway`);
           responseDetails = `Hitilafu ya Oasis (HTTP ${response.status}): ${cleanMsg}`;
         }
       } catch (err: unknown) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        const isCorsError = errMsg.toLowerCase().includes("failed to fetch") || errMsg.toLowerCase().includes("networkerror");
-        
-        if (isCorsError) {
-          isSuccess = false;
-          responseDetails = `Kizuizi cha Kivinjari (CORS Error): Server ya Oasis inakataa maombi ya moja kwa moja. Mfumo unatumia Server Proxy kurekebisha hili.`;
-        } else {
-          isSuccess = false;
-          responseDetails = `Hitilafu ya Mtandao: ${errMsg}`;
-        }
+        isSuccess = false;
+        responseDetails = `Hitilafu ya Mtandao: ${errMsg}`;
       }
 
       const logItem = {
