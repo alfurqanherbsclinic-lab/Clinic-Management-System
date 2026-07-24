@@ -1,5 +1,3 @@
-import firebaseConfig from '../../firebase-applet-config.json' assert { type: 'json' };
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,24 +15,22 @@ export default async function handler(req, res) {
     const senderName = sender || req.body?.sender || 'AHC MKONONI';
     const apiEndpoint = baseUrl || 'https://bulksms.oasistech.co.tz/api/sms';
 
-    // 1. Fetch active reminders from Firestore REST API with error protection
+    // Taarifa za Firebase moja kwa moja ili kuondoa tatizo la faili la JSON
+    const projectId = "alfurqan-clinic"; // Badilisha uweka Project ID yako halisi kama ni tofauti
+    const dbId = "(default)";
+    const firestoreKey = ""; // Weka API key yako ya Firebase hapa kama inahitajika, au acha wazi kama haina ulinzi wa key
+
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/patient_reminders`;
+
     let docs = [];
     try {
-      const projectId = firebaseConfig.projectId;
-      const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
-      const firestoreKey = firebaseConfig.apiKey;
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/patient_reminders?key=${firestoreKey}`;
-      
       const fsRes = await fetch(firestoreUrl);
       if (fsRes.ok) {
         const fsData = await fsRes.json();
         docs = fsData.documents || [];
-      } else {
-        const errText = await fsRes.text();
-        console.log("Firestore haikubali:", errText);
       }
     } catch (e) {
-      console.log("Hitilafu ya Firestore:", e.message);
+      console.log("Firestore fetch error:", e.message);
     }
 
     // Parse documents
@@ -47,14 +43,10 @@ export default async function handler(req, res) {
         dawaAlizopewa: fields.dawaAlizopewa?.stringValue || '',
         maelezoYaDawa: fields.maelezoYaDawa?.stringValue || '',
         haliYaUkumbusho: fields.haliYaUkumbusho?.stringValue || 'HAI',
-        mudaAsubuhi: fields.mudaAsubuhi?.stringValue || '08:00',
-        mudaMchana: fields.mudaMchana?.stringValue || '14:00',
-        mudaJioni: fields.mudaJioni?.stringValue || '20:00',
         tareheIliyowashwa: fields.tareheIliyowashwa?.stringValue || ''
       };
     }).filter(r => r.haliYaUkumbusho === 'HAI' && r.nambaSimu);
 
-    // Filter duplicates by phone number
     const phoneMap = new Map();
     reminders.forEach(r => {
       const cleanPhone = r.nambaSimu.replace(/[^\d]/g, '');
@@ -68,7 +60,6 @@ export default async function handler(req, res) {
     const targetSlot = (slot || 'auto').toLowerCase();
     const results = [];
 
-    // Dispatch SMS via Oasis
     for (const patient of activeList) {
       let phone = patient.nambaSimu.replace(/[^\d]/g, '');
       if (phone.startsWith('0')) {
@@ -127,8 +118,7 @@ export default async function handler(req, res) {
       timestamp: new Date().toISOString()
     });
 
-  } catch (error) {
-    // Inajibu 200 hata kukitokea tatizo la ghafla ili cron-job isilete Failed
+  }(error) {
     return res.status(200).json({ status: 'error', message: error.message });
   }
 }
