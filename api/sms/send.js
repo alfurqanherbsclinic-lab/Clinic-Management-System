@@ -42,6 +42,8 @@ export default async function handler(req, res) {
       sender_id: senderName
     };
 
+    console.log("Inatuma SMS kwenda Oasis:", simu, "Kutoka:", senderName);
+
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
@@ -59,8 +61,13 @@ export default async function handler(req, res) {
       data = { raw: responseText };
     }
 
+    // Hizi zitaandika majibu yote ya Oasis kwenye Vercel Logs
+    console.log("Oasis Response Status:", response.status);
+    console.log("Oasis Response Data:", JSON.stringify(data));
+
     return res.status(response.status).json(data);
   } catch (error) {
+    console.error("SMS Dispatch Error:", error.message);
     return res.status(500).json({ error: error.message });
   }
 }
