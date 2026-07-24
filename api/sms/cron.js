@@ -17,32 +17,31 @@ export default async function handler(req, res) {
     const senderName = sender || req.body?.sender || 'AHC MKONONI';
     const apiEndpoint = baseUrl || 'https://bulksms.oasistech.co.tz/api/sms';
 
-    // 1. Fetch active reminders from Firestore REST API
-const projectId = firebaseConfig.projectId;
-const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
-const firestoreKey = firebaseConfig.apiKey;
-const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/patient_reminders?key=${firestoreKey}`;
-
-let docs = [];
-try {
-    const fsRes = await fetch(firestoreUrl);
-    if (fsRes.ok) {
+    // 1. Fetch active reminders from Firestore REST API with error protection
+    let docs = [];
+    try {
+      const projectId = firebaseConfig.projectId;
+      const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+      const firestoreKey = firebaseConfig.apiKey;
+      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/patient_reminders?key=${firestoreKey}`;
+      
+      const fsRes = await fetch(firestoreUrl);
+      if (fsRes.ok) {
         const fsData = await fsRes.json();
         docs = fsData.documents || [];
-    } else {
+      } else {
         const errText = await fsRes.text();
         console.log("Firestore haikubali:", errText);
+      }
+    } catch (e) {
+      console.log("Hitilafu ya Firestore:", e.message);
     }
-} catch (e) {
-    console.log("Hitilafu ya Firestore:", e.message);
-}
-
 
     // Parse documents
     const reminders = docs.map(docItem => {
       const fields = docItem.fields || {};
       return {
-        id: docItem.name.split('/').pop(),
+        id: docItem.name ? docItem.name.split('/').pop() : '1',
         jinaMgonjwa: fields.jinaMgonjwa?.stringValue || 'Mgonjwa',
         nambaSimu: fields.nambaSimu?.stringValue || '',
         dawaAlizopewa: fields.dawaAlizopewa?.stringValue || '',
@@ -129,6 +128,7 @@ try {
     });
 
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    // Inajibu 200 hata kukitokea tatizo la ghafla ili cron-job isilete Failed
+    return res.status(200).json({ status: 'error', message: error.message });
   }
 }
