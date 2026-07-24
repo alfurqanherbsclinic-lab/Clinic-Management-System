@@ -18,20 +18,25 @@ export default async function handler(req, res) {
     const apiEndpoint = baseUrl || 'https://bulksms.oasistech.co.tz/api/sms';
 
     // 1. Fetch active reminders from Firestore REST API
-    const projectId = firebaseConfig.projectId;
-    const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
-    const firestoreKey = firebaseConfig.apiKey;
-    
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/patient_reminders?key=${firestoreKey}`;
+const projectId = firebaseConfig.projectId;
+const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
+const firestoreKey = firebaseConfig.apiKey;
+const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/patient_reminders?key=${firestoreKey}`;
 
+let docs = [];
+try {
     const fsRes = await fetch(firestoreUrl);
-    if (!fsRes.ok) {
-      const errText = await fsRes.text();
-      return res.status(500).json({ error: 'Hitilafu ya Firestore API', details: errText });
+    if (fsRes.ok) {
+        const fsData = await fsRes.json();
+        docs = fsData.documents || [];
+    } else {
+        const errText = await fsRes.text();
+        console.log("Firestore haikubali:", errText);
     }
+} catch (e) {
+    console.log("Hitilafu ya Firestore:", e.message);
+}
 
-    const fsData = await fsRes.json();
-    const docs = fsData.documents || [];
 
     // Parse documents
     const reminders = docs.map(docItem => {
