@@ -15,11 +15,8 @@ export default async function handler(req, res) {
     const senderName = sender || req.body?.sender || 'AHC MKONONI';
     const apiEndpoint = baseUrl || 'https://bulksms.oasistech.co.tz/api/sms';
 
-    // Taarifa za Firebase moja kwa moja ili kuondoa tatizo la faili la JSON
-    const projectId = "alfurqan-clinic"; // Badilisha uweka Project ID yako halisi kama ni tofauti
+    const projectId = "alfurqan-clinic";
     const dbId = "(default)";
-    const firestoreKey = ""; // Weka API key yako ya Firebase hapa kama inahitajika, au acha wazi kama haina ulinzi wa key
-
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/patient_reminders`;
 
     let docs = [];
@@ -33,7 +30,6 @@ export default async function handler(req, res) {
       console.log("Firestore fetch error:", e.message);
     }
 
-    // Parse documents
     const reminders = docs.map(docItem => {
       const fields = docItem.fields || {};
       return {
@@ -118,7 +114,7 @@ export default async function handler(req, res) {
       timestamp: new Date().toISOString()
     });
 
-  }(error) {
+  } catch (error) {
     return res.status(200).json({ status: 'error', message: error.message });
   }
 }
