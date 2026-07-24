@@ -39,21 +39,23 @@ export default async function handler(req, res) {
         dawaAlizopewa: fields.dawaAlizopewa?.stringValue || '',
         maelezoYaDawa: fields.maelezoYaDawa?.stringValue || '',
         haliYaUkumbusho: fields.haliYaUkumbusho?.stringValue || 'HAI',
-        tareheIliyowashwa: fields.tareheIliyowashwa?.stringValue || ''
+        tareheIliyowashwa: fields.tareheIliyowashwa?.stringValue || '',
+        mudaJioni: fields.mudaJioni?.stringValue || '20:00',
+        mudaAsubuhi: fields.mudaAsubuhi?.stringValue || '08:00',
+        mudaMchana: fields.mudaMchana?.stringValue || '14:00'
       };
     }).filter(r => r.haliYaUkumbusho === 'HAI' && r.nambaSimu);
 
-    const phoneMap = new Map();
-    reminders.forEach(r => {
-      const cleanPhone = r.nambaSimu.replace(/[^\d]/g, '');
-      if (!cleanPhone) return;
-      if (!phoneMap.has(cleanPhone)) {
-        phoneMap.set(cleanPhone, r);
-      }
+    const targetSlot = (slot || 'auto').toLowerCase();
+    
+    // Kuchuja wagonjwa kulingana na slot husika ili isisome 'totalActive: 0'
+    const activeList = reminders.filter(r => {
+      if (targetSlot === 'subhi' || targetSlot === 'asubuhi') return !!r.mudaAsubuhi;
+      if (targetSlot === 'mchana') return !!r.mudaMchana;
+      if (targetSlot === 'jioni') return !!r.mudaJioni;
+      return true; // Kama ni auto, chukua wote
     });
 
-    const activeList = Array.from(phoneMap.values());
-    const targetSlot = (slot || 'auto').toLowerCase();
     const results = [];
 
     for (const patient of activeList) {
