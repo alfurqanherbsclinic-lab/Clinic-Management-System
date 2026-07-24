@@ -27,38 +27,29 @@ export default async function handler(req, res) {
         docs = fsData.documents || [];
       }
     } catch (e) {
-      console.log("Firestore fetch error:", e.message);
+      console.log("Firestore error:", e.message);
     }
 
+    // Kuchomoa data bila kujali ukubwa au udogo wa herufi (Case-insensitive)
     const reminders = docs.map(docItem => {
       const fields = docItem.fields || {};
+      const getVal = (f) => f?.stringValue || f?.integerValue || f?.booleanValue || '';
       return {
         id: docItem.name ? docItem.name.split('/').pop() : '1',
-        jinaMgonjwa: fields.jinaMgonjwa?.stringValue || 'Mgonjwa',
-        nambaSimu: fields.nambaSimu?.stringValue || '',
-        dawaAlizopewa: fields.dawaAlizopewa?.stringValue || '',
-        maelezoYaDawa: fields.maelezoYaDawa?.stringValue || '',
-        haliYaUkumbusho: fields.haliYaUkumbusho?.stringValue || 'HAI',
-        tareheIliyowashwa: fields.tareheIliyowashwa?.stringValue || '',
-        mudaJioni: fields.mudaJioni?.stringValue || '20:00',
-        mudaAsubuhi: fields.mudaAsubuhi?.stringValue || '08:00',
-        mudaMchana: fields.mudaMchana?.stringValue || '14:00'
+        jinaMgonjwa: getVal(fields.jinaMgonjwa) || 'Mgonjwa',
+        nambaSimu: String(getVal(fields.nambaSimu) || ''),
+        dawaAlizopewa: getVal(fields.dawaAlizopewa) || '',
+        maelezoYaDawa: getVal(fields.maelezoYaDawa) || '',
+        haliYaUkumbusho: String(getVal(fields.haliYaUkumbusho) || 'HAI').toUpperCase()
       };
-    }).filter(r => r.haliYaUkumbusho === 'HAI' && r.nambaSimu);
-
-    const targetSlot = (slot || 'auto').toLowerCase();
-    console.log(`--- UCHAMBUZI WA ${targetSlot.toUpperCase()} WAANZA ---`);
-    console.log(`Wagonjwa wote wenye hali 'HAI': ${reminders.length}`);
-    
-    // Kuchuja wagonjwa
-    const activeList = reminders.filter(r => {
-      if (targetSlot === 'subhi' || targetSlot === 'asubuhi') return !!r.mudaAsubuhi;
-      if (targetSlot === 'mchana') return !!r.mudaMchana;
-      if (targetSlot === 'jioni') return !!r.mudaJioni;
-      return true;
     });
 
-    console.log(`Wagonjwa waliothibitishwa kwa ajili ya ${targetSlot}: ${activeList.length}`);
+    // Kuchuja wagonjwa wote wenye namba ya simu bila kuweka ngumu kwenye neno 'HAI'
+    const activeList = reminders.filter(r => r.nambaSimu.length > 5);
+    const targetSlot = (slot || 'auto').toLowerCase();
+    
+    console.log(`Jumla ya wagonjwa waliotangazwa kwenye mfumo: ${reminders.length}`);
+    console.log(`Wagonjwa watakaotumiwa ujumbe: ${activeList.length}`);
 
     const results = [];
 
@@ -74,8 +65,6 @@ export default async function handler(req, res) {
       else if (targetSlot === 'jioni') slotName = 'Jioni';
 
       const msg = `Assalam Alaykum / Habari Ndg ${patient.jinaMgonjwa.toUpperCase()}, huu ni ukumbusho wa Al-Furqan Herbs Clinic wa kunywa dawa zako: ${patient.dawaAlizopewa}. ${patient.maelezoYaDawa ? 'Maelezo: ' + patient.maelezoYaDawa + '.' : ''} Awamu: ${slotName}. Afya bora ni mtaji wako!`;
-
-      console.log(`> Inatuma ujumbe kwa: ${patient.jinaMgonjwa} Namba: ${phone}`);
 
       try {
         const smsRes = await fetch(apiEndpoint, {
@@ -96,8 +85,6 @@ export default async function handler(req, res) {
         });
 
         const smsData = await smsRes.json().catch(() => ({}));
-        console.log(`> Majibu kutoka Oasis kwa ${patient.jinaMgonjwa}:`, smsData);
-        
         results.push({
           patient: patient.jinaMgonjwa,
           phone: phone,
@@ -106,7 +93,6 @@ export default async function handler(req, res) {
           response: smsData
         });
       } catch (err) {
-        console.error(`> Kosa kutuma kwa ${patient.jinaMgonjwa}:`, err.message);
         results.push({
           patient: patient.jinaMgonjwa,
           phone: phone,
@@ -117,8 +103,6 @@ export default async function handler(req, res) {
       }
     }
 
-    console.log(`--- UCHAMBUZI UMEKAMILIKA ---`);
-
     return res.status(200).json({
       status: 'success',
       totalActive: activeList.length,
@@ -128,7 +112,6 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error("Critical Error imetokea:", error.message);
     return res.status(200).json({ status: 'error', message: error.message });
   }
 }
