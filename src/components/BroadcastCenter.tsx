@@ -1999,13 +1999,29 @@ exports.scheduledMedicationReminder = functions.pubsub
   });`}</pre>
               </div>
 
+              <div className="bg-emerald-50 border border-emerald-300 p-3 rounded-xl space-y-2 text-emerald-950 font-medium">
+                <span className="font-extrabold flex items-center gap-1.5 text-emerald-900">
+                  <Zap className="w-4 h-4 text-emerald-700" />
+                  <span>NJIA RAHISI NA YA HARAKA: Web Cron Trigger (Bila Kufunga Simu)</span>
+                </span>
+                <p className="text-[11px] leading-relaxed">
+                  Ili SMS zianze kujituma zenyewe 24/7 masaa 24 hata kama hujaifungua hii App/Website, unatumia Server Cron URL yetu ya bure:
+                </p>
+                <div className="bg-white p-2 rounded-lg border border-emerald-200 font-mono text-[11px] select-all text-emerald-900 font-bold">
+                  {window.location.origin}/api/sms/cron?slot=subhi
+                </div>
+                <p className="text-[11px] text-emerald-800">
+                  Unaisajili URL hii kwenye mtandao wa bure kama <strong>cron-job.org</strong> kuipigia simu kila siku Saa 08:00 (Subhi), Saa 14:00 (Mchana), na Saa 20:00 (Jioni). Itatuma SMS kwa wagonjwa wote papo hapo!
+                </p>
+              </div>
+
               <div className="bg-amber-50 border border-amber-300 p-3 rounded-xl space-y-1 text-amber-900 font-medium">
                 <span className="font-extrabold flex items-center gap-1">
                   <Info className="w-4 h-4 text-amber-600" />
-                  <span>Njia Rahisi Basi za Kila Siku (Kutoka kwenye Mfumo):</span>
+                  <span>Njia ya Papo Hapo Mfumo Unapokuwa Wazi:</span>
                 </span>
                 <p>
-                  Kwa sasa, ukiwa kwenye mfumo huu, unaweza pia kutumia vitufe vya <strong>"SMS Subhi"</strong> na <strong>"SMS Jioni"</strong> kwenye orodha iliyopo hapo juu ili kutuma ukumbusho papo hapo kupitia Oasis SMS Gateway.
+                  Ukifungua mfumo asubuhi au jioni, unaweza pia kubonyeza kitufe cha <strong>"Subhi Yote"</strong> au <strong>"Jioni Yote"</strong> kwenye Batch panel ili kuwatumia wagonjwa wote waliopo kwa mbofyo mmoja tu.
                 </p>
               </div>
             </div>
