@@ -1,12 +1,3 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, getDocs } from "firebase/firestore";
-import firebaseConfig from "../../firebase-applet-config.json";
-
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)"
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -24,24 +15,36 @@ export default async function handler(req, res) {
     const senderName = sender || req.body?.sender || 'AHC MKONONI';
     const apiEndpoint = baseUrl || 'https://bulksms.oasistech.co.tz/api/sms';
 
+    const projectId = "circular-simplicity-kdw77";
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/patient_reminders`;
+
     let reminders = [];
 
-    // Tunachota data kutoka Firestore kwa kutumia SDK rasmi ya mradi
     try {
-      const querySnapshot = await getDocs(collection(db, "patient_reminders"));
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data() || {};
-        if (data.nambaSimu || data.jinaMgonjwa) {
-          reminders.push({
-            jinaMgonjwa: data.jinaMgonjwa || 'Mgonjwa',
-            nambaSimu: String(data.nambaSimu || ''),
-            dawaAlizopewa: data.dawaAlizopewa || '',
-            maelezoYaDawa: data.maelezoYaZiada || data.maelezoYaDawa || ''
-          });
+      const fsRes = await fetch(firestoreUrl);
+      if (fsRes.ok) {
+        const fsData = await fsRes.json();
+        const docs = fsData.documents || [];
+        
+        for (const doc of docs) {
+          const fields = doc.fields || {};
+          const name = fields.jinaMgonjwa?.stringValue || 'Mgonjwa';
+          const phone = fields.nambaSimu?.stringValue || '';
+          const dawa = fields.dawaAlizopewa?.stringValue || 'Dawa';
+          const maelezo = fields.maelezoYaZiada?.stringValue || fields.maelezoYaDawa?.stringValue || '';
+
+          if (phone) {
+            reminders.push({
+              jinaMgonjwa: name,
+              nambaSimu: String(phone),
+              dawaAlizopewa: dawa,
+              maelezoYaDawa: maelezo
+            });
+          }
         }
-      });
-    } catch (errDb) {
-      console.log("DB Read Error:", errDb.message);
+      }
+    } catch (err) {
+      console.log("Fetch error:", err.message);
     }
 
     const activeList = reminders.filter(r => r.nambaSimu && r.nambaSimu.length > 5);
