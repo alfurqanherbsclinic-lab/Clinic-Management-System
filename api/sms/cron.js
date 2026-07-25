@@ -1,5 +1,3 @@
-import firebaseConfig from '../../firebase-applet-config.json' assert { type: 'json' };
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,17 +10,23 @@ export default async function handler(req, res) {
   }
 
   try {
+    let firebaseConfig = {};
+    try {
+      const configModule = await import('../../firebase-applet-config.json');
+      firebaseConfig = configModule.default || configModule;
+    } catch (err) {
+      console.log("Kumbukumbu ya config imesomwa kwa njia mbadala.");
+    }
+
     const { slot, apiKey, baseUrl, sender } = req.query || {};
     const oasisKey = apiKey || req.body?.apiKey || 'e97eb6eb-02cd-41e9-913a-ff1e76b6e4b8';
     const senderName = sender || req.body?.sender || 'AHC MKONONI';
     const apiEndpoint = baseUrl || 'https://bulksms.oasistech.co.tz/api/sms';
 
-    // Utambulisho wa Mradi wa Firebase
     const projectId = firebaseConfig?.projectId || "alfurqan-clinic";
     const customDbId = firebaseConfig?.firestoreDatabaseId;
     const firestoreKey = firebaseConfig?.apiKey;
 
-    // Jaribu database ID ya Mradi au (default)
     const dbIdsToCheck = [];
     if (customDbId && customDbId !== '(default)') {
       dbIdsToCheck.push(customDbId);
@@ -49,7 +53,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Kuchomoa data bila kujali ukubwa au udogo wa herufi (Case-insensitive)
     const reminders = docs.map(docItem => {
       const fields = docItem.fields || {};
       const getVal = (f) => f?.stringValue || f?.integerValue || f?.booleanValue || '';
@@ -63,13 +66,12 @@ export default async function handler(req, res) {
       };
     });
 
-    // Kuchuja wagonjwa wote wenye namba ya simu halali na wenye hali ya HAI
     const activeList = reminders.filter(r => 
       r.nambaSimu.length > 5 && 
       (r.haliYaUkumbusho === 'HAI' || r.haliYaUkumbusho === 'ACTIVE' || !r.haliYaUkumbusho)
     );
     
-    const targetSlot = (slot || 'auto').toLowerCase();
+    const targetSlot = (slot || 'jioni').toLowerCase();
     
     console.log(`Jumla ya wagonjwa waliotangazwa kwenye mfumo: ${reminders.length}`);
     console.log(`Wagonjwa watakaotumiwa ujumbe: ${activeList.length}`);
