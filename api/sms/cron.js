@@ -1,3 +1,5 @@
+import firebaseConfig from '../../firebase-applet-config.json' assert { type: 'json' };
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -15,19 +17,36 @@ export default async function handler(req, res) {
     const senderName = sender || req.body?.sender || 'AHC MKONONI';
     const apiEndpoint = baseUrl || 'https://bulksms.oasistech.co.tz/api/sms';
 
-    const projectId = "alfurqan-clinic";
-    const dbId = "(default)";
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/patient_reminders`;
+    // Utambulisho wa Mradi wa Firebase
+    const projectId = firebaseConfig?.projectId || "alfurqan-clinic";
+    const customDbId = firebaseConfig?.firestoreDatabaseId;
+    const firestoreKey = firebaseConfig?.apiKey;
+
+    // Jaribu database ID ya Mradi au (default)
+    const dbIdsToCheck = [];
+    if (customDbId && customDbId !== '(default)') {
+      dbIdsToCheck.push(customDbId);
+    }
+    dbIdsToCheck.push('(default)');
 
     let docs = [];
-    try {
-      const fsRes = await fetch(firestoreUrl);
-      if (fsRes.ok) {
-        const fsData = await fsRes.json();
-        docs = fsData.documents || [];
+
+    for (const dbId of dbIdsToCheck) {
+      const keyParam = firestoreKey ? `?key=${firestoreKey}` : '';
+      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/patient_reminders${keyParam}`;
+
+      try {
+        const fsRes = await fetch(firestoreUrl);
+        if (fsRes.ok) {
+          const fsData = await fsRes.json();
+          if (fsData.documents && fsData.documents.length > 0) {
+            docs = fsData.documents;
+            break;
+          }
+        }
+      } catch (e) {
+        console.log(`Firestore fetch error (${dbId}):`, e.message);
       }
-    } catch (e) {
-      console.log("Firestore error:", e.message);
     }
 
     // Kuchomoa data bila kujali ukubwa au udogo wa herufi (Case-insensitive)
@@ -39,13 +58,17 @@ export default async function handler(req, res) {
         jinaMgonjwa: getVal(fields.jinaMgonjwa) || 'Mgonjwa',
         nambaSimu: String(getVal(fields.nambaSimu) || ''),
         dawaAlizopewa: getVal(fields.dawaAlizopewa) || '',
-        maelezoYaDawa: getVal(fields.maelezoYaDawa) || '',
+        maelezoYaDawa: getVal(fields.maelezoYaZiada) || getVal(fields.maelezoYaDawa) || '',
         haliYaUkumbusho: String(getVal(fields.haliYaUkumbusho) || 'HAI').toUpperCase()
       };
     });
 
-    // Kuchuja wagonjwa wote wenye namba ya simu bila kuweka ngumu kwenye neno 'HAI'
-    const activeList = reminders.filter(r => r.nambaSimu.length > 5);
+    // Kuchuja wagonjwa wote wenye namba ya simu halali na wenye hali ya HAI
+    const activeList = reminders.filter(r => 
+      r.nambaSimu.length > 5 && 
+      (r.haliYaUkumbusho === 'HAI' || r.haliYaUkumbusho === 'ACTIVE' || !r.haliYaUkumbusho)
+    );
+    
     const targetSlot = (slot || 'auto').toLowerCase();
     
     console.log(`Jumla ya wagonjwa waliotangazwa kwenye mfumo: ${reminders.length}`);
@@ -105,6 +128,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       status: 'success',
+      totalFound: reminders.length,
       totalActive: activeList.length,
       dispatchedCount: results.filter(r => r.status === 'success').length,
       results: results,
