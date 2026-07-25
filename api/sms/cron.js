@@ -1,13 +1,3 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, getDocs } from "firebase/firestore";
-import firebaseConfig from "../../firebase-applet-config.json";
-
-// Sanidi muunganisho wa Firebase kwa kutumia config ya mradi
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)"
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -25,29 +15,52 @@ export default async function handler(req, res) {
     const senderName = sender || req.body?.sender || 'AHC MKONONI';
     const apiEndpoint = baseUrl || 'https://bulksms.oasistech.co.tz/api/sms';
 
+    const projectId = "circular-simplicity-kdw77";
+    
+    // Tunajaribu kusoma kupitia Firestore REST API ya moja kwa moja kwenye tables tofauti
+    const possiblePaths = [
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/patient_reminders`,
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/patients`,
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/Appointments`,
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/wagonjwa`
+    ];
+
     let reminders = [];
 
-    // Tunachota data kutoka kwenye collection ya patient_reminders kwa kutumia Firebase SDK
-    try {
-      const querySnapshot = await getDocs(collection(db, "patient_reminders"));
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data() || {};
-        
-        // Kama data ipo moja kwa moja kwenye document
-        if (data.nambaSimu || data.jinaMgonjwa) {
-          reminders.push({
-            jinaMgonjwa: data.jinaMgonjwa || 'Mgonjwa',
-            nambaSimu: String(data.nambaSimu || ''),
-            dawaAlizopewa: data.dawaAlizopewa || '',
-            maelezoYaDawa: data.maelezoYaZiada || data.maelezoYaDawa || ''
-          });
+    for (const url of possiblePaths) {
+      try {
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          const documents = data.documents || [];
+          
+          for (const doc of documents) {
+            const fields = doc.fields || {};
+            const name = fields.jinaMgonjwa?.stringValue || fields.name?.stringValue || fields.fullName?.stringValue;
+            const phone = fields.nambaSimu?.stringValue || fields.phone?.stringValue || fields.phoneNumber?.stringValue;
+            const dawa = fields.dawaAlizopewa?.stringValue || fields.medication?.stringValue || '';
+            const maelezo = fields.maelezoYaZiada?.stringValue || fields.maelezoYaDawa?.stringValue || '';
+
+            if (phone) {
+              reminders.push({
+                jinaMgonjwa: name || 'Mgonjwa',
+                nambaSimu: String(phone),
+                dawaAlizopewa: dawa || 'Dawa',
+                maelezoYaDawa: maelezo
+              });
+            }
+          }
         }
-      });
-    } catch (dbErr) {
-      console.log("Hitilafu ya kusoma Firestore SDK:", dbErr.message);
+      } catch (errPath) {
+        console.log("Path error:", errPath);
+      }
     }
 
-    const activeList = reminders.filter(r => r.nambaSimu && r.nambaSimu.length > 5);
+    // Ondoa namba zinazojirudia
+    const uniqueReminders = Array.from(new Set(reminders.map(a => a.nambaSimu)))
+      .map(phone => reminders.find(a => a.nambaSimu === phone));
+
+    const activeList = uniqueReminders.filter(r => r && r.nambaSimu && r.nambaSimu.length > 5);
     const targetSlot = (slot || 'jioni').toLowerCase();
 
     const results = [];
@@ -104,7 +117,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       status: 'success',
-      totalFound: reminders.length,
+      totalFound: uniqueReminders.length,
       totalActive: activeList.length,
       dispatchedCount: results.filter(r => r.status === 'success').length,
       results: results,
