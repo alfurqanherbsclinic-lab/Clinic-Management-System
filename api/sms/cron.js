@@ -10,47 +10,32 @@ export default async function handler(req, res) {
   }
 
   try {
-    let firebaseConfig = {};
-    try {
-      const configModule = await import('../../firebase-applet-config.json');
-      firebaseConfig = configModule.default || configModule;
-    } catch (err) {
-      console.log("Kumbukumbu ya config imesomwa kwa njia mbadala.");
-    }
-
     const { slot, apiKey, baseUrl, sender } = req.query || {};
     const oasisKey = apiKey || req.body?.apiKey || 'e97eb6eb-02cd-41e9-913a-ff1e76b6e4b8';
     const senderName = sender || req.body?.sender || 'AHC MKONONI';
     const apiEndpoint = baseUrl || 'https://bulksms.oasistech.co.tz/api/sms';
 
-    const projectId = firebaseConfig?.projectId || "alfurqan-clinic";
-    const customDbId = firebaseConfig?.firestoreDatabaseId;
-    const firestoreKey = firebaseConfig?.apiKey;
+    // Tunatumia jina sahihi la mradi wako uliopo kwenye Firebase Console
+    const projectId = "circular-simplicity-kdw77";
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/patient_reminders`;
 
-    const dbIdsToCheck = [];
-    if (customDbId && customDbId !== '(default)') {
-      dbIdsToCheck.push(customDbId);
-    }
-    dbIdsToCheck.push('(default)');
+    console.log("Inajaribu kuunganisha na Firestore URL:", firestoreUrl);
 
     let docs = [];
-
-    for (const dbId of dbIdsToCheck) {
-      const keyParam = firestoreKey ? `?key=${firestoreKey}` : '';
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${dbId}/documents/patient_reminders${keyParam}`;
-
-      try {
-        const fsRes = await fetch(firestoreUrl);
-        if (fsRes.ok) {
-          const fsData = await fsRes.json();
-          if (fsData.documents && fsData.documents.length > 0) {
-            docs = fsData.documents;
-            break;
-          }
-        }
-      } catch (e) {
-        console.log(`Firestore fetch error (${dbId}):`, e.message);
+    try {
+      const fsRes = await fetch(firestoreUrl);
+      const fsText = await fsRes.text();
+      
+      console.log("Majibu ya Firestore Status:", fsRes.status);
+      
+      if (fsRes.ok) {
+        const fsData = JSON.parse(fsText);
+        docs = fsData.documents || [];
+      } else {
+        console.log("Firestore imekataa:", fsText);
       }
+    } catch (e) {
+      console.log("Hitilafu ya mtandao kwenda Firebase:", e.message);
     }
 
     const reminders = docs.map(docItem => {
@@ -66,11 +51,7 @@ export default async function handler(req, res) {
       };
     });
 
-    const activeList = reminders.filter(r => 
-      r.nambaSimu.length > 5 && 
-      (r.haliYaUkumbusho === 'HAI' || r.haliYaUkumbusho === 'ACTIVE' || !r.haliYaUkumbusho)
-    );
-    
+    const activeList = reminders.filter(r => r.nambaSimu.length > 5);
     const targetSlot = (slot || 'jioni').toLowerCase();
     
     console.log(`Jumla ya wagonjwa waliotangazwa kwenye mfumo: ${reminders.length}`);
