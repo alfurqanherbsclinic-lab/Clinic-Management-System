@@ -1,3 +1,6 @@
+import { initializeApp, getApps } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -10,52 +13,76 @@ export default async function handler(req, res) {
   }
 
   try {
+    let firebaseConfig = {};
+    try {
+      const configModule = await import('../../firebase-applet-config.json');
+      firebaseConfig = configModule.default || configModule;
+    } catch (err) {
+      console.log("Kumbukumbu ya config imesomwa kwa njia mbadala.");
+    }
+
     const { slot, apiKey, baseUrl, sender } = req.query || {};
     const oasisKey = apiKey || req.body?.apiKey || 'e97eb6eb-02cd-41e9-913a-ff1e76b6e4b8';
     const senderName = sender || req.body?.sender || 'AHC MKONONI';
     const apiEndpoint = baseUrl || 'https://bulksms.oasistech.co.tz/api/sms';
 
-    // Tunatumia jina sahihi la mradi wako uliopo kwenye Firebase Console
+    // Njia mbadala ya moja kwa moja kupitia REST API kwa ajili ya kusoma sub-collection ya Firebase
     const projectId = "circular-simplicity-kdw77";
+    
+    // Tunachota data kwa kutumia njia ya moja kwa moja ya dokumenti zilizopo chini ya patient_reminders
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/patient_reminders`;
 
-    console.log("Inajaribu kuunganisha na Firestore URL:", firestoreUrl);
-
-    let docs = [];
+    let reminders = [];
     try {
       const fsRes = await fetch(firestoreUrl);
-      const fsText = await fsRes.text();
-      
-      console.log("Majibu ya Firestore Status:", fsRes.status);
-      
       if (fsRes.ok) {
-        const fsData = JSON.parse(fsText);
-        docs = fsData.documents || [];
-      } else {
-        console.log("Firestore imekataa:", fsText);
+        const fsData = await fsRes.json();
+        const docs = fsData.documents || [];
+        
+        for (const doc of docs) {
+          const docPath = doc.name; // mfano: projects/.../documents/patient_reminders/A2AWpN...
+          const fields = doc.fields || {};
+          
+          // Kama data ipo moja kwa moja hapa
+          if (fields.nambaSimu) {
+            reminders.push({
+              jinaMgonjwa: fields.jinaMgonjwa?.stringValue || 'Mgonjwa',
+              nambaSimu: String(fields.nambaSimu?.stringValue || ''),
+              dawaAlizopewa: fields.dawaAlizopewa?.stringValue || '',
+              maelezoYaDawa: fields.maelezoYaZiada?.stringValue || fields.maelezoYaDawa?.stringValue || ''
+            });
+          }
+
+          // Kama kuna sub-collection ndani yake (kama ilivyoonekana kwenye picha yako)
+          try {
+            const subColUrl = `https://firestore.googleapis.com/v1/${docPath}/patient_reminders`;
+            const subRes = await fetch(subColUrl);
+            if (subRes.ok) {
+              const subData = await subRes.json();
+              const subDocs = subData.documents || [];
+              for (const subDoc of subDocs) {
+                const subFields = subDoc.fields || {};
+                if (subFields.nambaSimu) {
+                  reminders.push({
+                    jinaMgonjwa: subFields.jinaMgonjwa?.stringValue || 'Mgonjwa',
+                    nambaSimu: String(subFields.nambaSimu?.stringValue || ''),
+                    dawaAlizopewa: subFields.dawaAlizopewa?.stringValue || '',
+                    maelezoYaDawa: subFields.maelezoYaZiada?.stringValue || subFields.maelezoYaDawa?.stringValue || ''
+                  });
+                }
+              }
+            }
+          } catch (subErr) {
+            console.log("Sub-collection check error:", subErr.message);
+          }
+        }
       }
     } catch (e) {
-      console.log("Hitilafu ya mtandao kwenda Firebase:", e.message);
+      console.log("Hitilafu ya kusoma Firestore:", e.message);
     }
-
-    const reminders = docs.map(docItem => {
-      const fields = docItem.fields || {};
-      const getVal = (f) => f?.stringValue || f?.integerValue || f?.booleanValue || '';
-      return {
-        id: docItem.name ? docItem.name.split('/').pop() : '1',
-        jinaMgonjwa: getVal(fields.jinaMgonjwa) || 'Mgonjwa',
-        nambaSimu: String(getVal(fields.nambaSimu) || ''),
-        dawaAlizopewa: getVal(fields.dawaAlizopewa) || '',
-        maelezoYaDawa: getVal(fields.maelezoYaZiada) || getVal(fields.maelezoYaDawa) || '',
-        haliYaUkumbusho: String(getVal(fields.haliYaUkumbusho) || 'HAI').toUpperCase()
-      };
-    });
 
     const activeList = reminders.filter(r => r.nambaSimu.length > 5);
     const targetSlot = (slot || 'jioni').toLowerCase();
-    
-    console.log(`Jumla ya wagonjwa waliotangazwa kwenye mfumo: ${reminders.length}`);
-    console.log(`Wagonjwa watakaotumiwa ujumbe: ${activeList.length}`);
 
     const results = [];
 
