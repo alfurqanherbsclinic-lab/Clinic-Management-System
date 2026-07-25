@@ -16,55 +16,63 @@ export default async function handler(req, res) {
     const apiEndpoint = baseUrl || 'https://bulksms.oasistech.co.tz/api/sms';
 
     const projectId = "circular-simplicity-kdw77";
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/patient_reminders`;
-
-    let reminders = [];
     
-    const fsRes = await fetch(firestoreUrl);
-    if (fsRes.ok) {
-      const fsData = await fsRes.json();
-      const docs = fsData.documents || [];
-      
-      for (const doc of docs) {
-        const docName = doc.name; 
-        const fields = doc.fields || {};
-        
-        // Kama mgonjwa yupo moja kwa moja kwenye document kuu
-        if (fields.nambaSimu) {
-          reminders.push({
-            jinaMgonjwa: fields.jinaMgonjwa?.stringValue || 'Mgonjwa',
-            nambaSimu: String(fields.nambaSimu?.stringValue || ''),
-            dawaAlizopewa: fields.dawaAlizopewa?.stringValue || '',
-            maelezoYaDawa: fields.maelezoYaZiada?.stringValue || fields.maelezoYaDawa?.stringValue || ''
-          });
-        }
+    // Orodha ya majina yanayoweza kuwa collection yako kwenye Firebase
+    const possibleCollections = ['patient_reminders', 'patients', 'wagonjwa', 'reminders', 'Appointments'];
+    let reminders = [];
 
-        // Kama mgonjwa yupo kwenye sub-collection ya ndani kama ilivyoonekana kwenye database yako
-        try {
-          const subUrl = `https://firestore.googleapis.com/v1/${docName}/patient_reminders`;
-          const subRes = await fetch(subUrl);
-          if (subRes.ok) {
-            const subData = await subRes.json();
-            const subDocs = subData.documents || [];
-            for (const subDoc of subDocs) {
-              const subFields = subDoc.fields || {};
-              if (subFields.nambaSimu) {
-                reminders.push({
-                  jinaMgonjwa: subFields.jinaMgonjwa?.stringValue || 'Mgonjwa',
-                  nambaSimu: String(subFields.nambaSimu?.stringValue || ''),
-                  dawaAlizopewa: subFields.dawaAlizopewa?.stringValue || '',
-                  maelezoYaDawa: subFields.maelezoYaZiada?.stringValue || subFields.maelezoYaDawa?.stringValue || ''
-                });
-              }
+    for (const colName of possibleCollections) {
+      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${colName}`;
+      try {
+        const fsRes = await fetch(firestoreUrl);
+        if (fsRes.ok) {
+          const fsData = await fsRes.json();
+          const docs = fsData.documents || [];
+          
+          for (const doc of docs) {
+            const docName = doc.name;
+            const fields = doc.fields || {};
+            
+            // Angalia kama ina namba ya simu moja kwa moja
+            if (fields.nambaSimu || fields.phone || fields.jinaMgonjwa) {
+              reminders.push({
+                jinaMgonjwa: fields.jinaMgonjwa?.stringValue || fields.name?.stringValue || 'Mgonjwa',
+                nambaSimu: String(fields.nambaSimu?.stringValue || fields.phone?.stringValue || ''),
+                dawaAlizopewa: fields.dawaAlizopewa?.stringValue || fields.medication?.stringValue || 'Dawa',
+                maelezoYaDawa: fields.maelezoYaZiada?.stringValue || fields.maelezoYaDawa?.stringValue || ''
+              });
             }
+
+            // Angalia sub-collections ndani yake
+            try {
+              const subUrl = `https://firestore.googleapis.com/v1/${docName}/patient_reminders`;
+              const subRes = await fetch(subUrl);
+              if (subRes.ok) {
+                const subData = await subRes.json();
+                const subDocs = subData.documents || [];
+                for (const subDoc of subDocs) {
+                  const subFields = subDoc.fields || {};
+                  if (subFields.nambaSimu || subFields.jinaMgonjwa) {
+                    reminders.push({
+                      jinaMgonjwa: subFields.jinaMgonjwa?.stringValue || 'Mgonjwa',
+                      nambaSimu: String(subFields.nambaSimu?.stringValue || ''),
+                      dawaAlizopewa: subFields.dawaAlizopewa?.stringValue || '',
+                      maelezoYaDawa: subFields.maelezoYaZiada?.stringValue || subFields.maelezoYaDawa?.stringValue || ''
+                    });
+                  }
+                }
+              }
+            } catch (errSub) {}
           }
-        } catch (subErr) {
-          console.log("Sub error:", subErr);
         }
-      }
+      } catch (errCol) {}
     }
 
-    const activeList = reminders.filter(r => r.nambaSimu.length > 5);
+    // Ondoa duplicate kama zipo
+    const uniqueReminders = Array.from(new Set(reminders.map(a => a.nambaSimu)))
+      .map(phone => reminders.find(a => a.nambaSimu === phone));
+
+    const activeList = uniqueReminders.filter(r => r && r.nambaSimu && r.nambaSimu.length > 5);
     const targetSlot = (slot || 'jioni').toLowerCase();
 
     const results = [];
@@ -121,7 +129,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       status: 'success',
-      totalFound: reminders.length,
+      totalFound: uniqueReminders.length,
       totalActive: activeList.length,
       dispatchedCount: results.filter(r => r.status === 'success').length,
       results: results,
