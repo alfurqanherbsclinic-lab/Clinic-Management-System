@@ -1,539 +1,350 @@
-export default async function handler(req, res) {
+// api/sms/cron.js
 
-res.setHeader('Access-Control-Allow-Origin','*');
-res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
-res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');
+import admin from "firebase-admin";
 
+// ===============================
+// FIREBASE CONNECTION
+// ===============================
 
-if(req.method==="OPTIONS"){
- return res.status(200).end();
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+    }),
+  });
 }
+
+const db = admin.firestore();
+
+
+// ===============================
+// SEND SMS FUNCTION (OASIS)
+// ===============================
+
+async function sendSMS(phone, message) {
+
+  try {
+
+    const response = await fetch(
+      "WEKA_OASIS_SMS_URL_HAPA",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.OASIS_API_KEY}`
+        },
+
+        body: JSON.stringify({
+          phone: phone,
+          message: message
+        })
+
+      }
+    );
+
+
+    const result = await response.json();
+
+    console.log("SMS RESPONSE:", result);
+
+
+    return true;
+
+
+  } catch(error){
+
+    console.log("SMS ERROR:", error);
+
+    return false;
+
+  }
+
+}
+
+
+
+// ===============================
+// TIME FORMAT
+// ===============================
+
+function getCurrentTime(){
+
+  const now = new Date();
+
+  const hour = String(now.getHours()).padStart(2,"0");
+
+  const minute = String(now.getMinutes()).padStart(2,"0");
+
+
+  return `${hour}:${minute}`;
+
+}
+
+
+// ===============================
+// DATE FORMAT
+// ===============================
+
+function getToday(){
+
+ const now = new Date();
+
+ return now.toISOString().split("T")[0];
+
+}
+
+
+
+// ===============================
+// MAIN CRON HANDLER
+// ===============================
+
+export default async function handler(req,res){
 
 
 try{
 
 
-const {
-slot,
-apiKey,
-baseUrl,
-sender
-}=req.query || {};
+const currentTime = getCurrentTime();
 
-
-
-const oasisKey =
-apiKey ||
-process.env.OASIS_API_KEY ||
-"e97eb6eb-02cd-41e9-913a-ff1e76b6e4b8";
-
-
-const senderName =
-sender ||
-"AHC MKONONI";
-
-
-const apiEndpoint =
-baseUrl ||
-"https://bulksms.oasistech.co.tz/api/sms";
-
-
-
-const projectId =
-"circular-simplicity-kdw77";
-
-
-const firestoreUrl =
-`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/patient_reminders`;
-
-
-
-const historyUrl =
-`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/sms_history`;
-
-
-
-
-
-// ==========================
-// FIRESTORE READ
-// ==========================
-
-
-let reminders=[];
-
-
-const fsResponse =
-await fetch(firestoreUrl);
-
-
-if(!fsResponse.ok){
-
-const errorText = await fsResponse.text();
-
-return res.status(500).json({
-
-error:"Firestore haijasomeka",
-
-statusCode: fsResponse.status,
-
-details:errorText
-
-});
-
-}
-
-
-
-const fsData =
-await fsResponse.json();
-
-
-const docs =
-fsData.documents || [];
+const today = getToday();
 
 
 
 console.log(
-"Firestore patients:",
-docs.length
-);
-
-
-
-for(const doc of docs){
-
-
-const f =
-doc.fields || {};
-
-
-reminders.push({
-
-
-id:doc.name,
-
-
-jinaMgonjwa:
-f.jinaMgonjwa?.stringValue || "Mgonjwa",
-
-
-nambaSimu:
-f.nambaSimu?.stringValue || "",
-
-
-dawaAlizopewa:
-f.dawaAlizopewa?.stringValue || "Dawa",
-
-
-maelezoYaDawa:
-f.maelezoYaDawa?.stringValue || "",
-
-
-haliYaUkumbusho:
-f.haliYaUkumbusho?.stringValue || "ACTIVE",
-
-
-mudaAsubuhi:
-f.mudaAsubuhi?.stringValue || "08:00",
-
-
-mudaMchana:
-f.mudaMchana?.stringValue || "14:00",
-
-
-mudaJioni:
-f.mudaJioni?.stringValue || "20:00"
-
-
-});
-
-
-}
-
-
-
-
-
-// ==========================
-// TIME TANZANIA
-// ==========================
-
-
-const now =
-new Date();
-
-
-const currentTime =
-now.toLocaleTimeString(
-'en-GB',
-{
-hour:'2-digit',
-minute:'2-digit',
-hour12:false,
-timeZone:'Africa/Dar_es_Salaam'
-});
-
-
-console.log(
-"Muda Tanzania:",
+"CHECK TIME:",
 currentTime
 );
 
 
 
-
-// dakika ya sasa
-
-function timeToMinutes(time){
-
-const parts =
-time.split(":");
-
-return Number(parts[0])*60 +
-Number(parts[1]);
-
-}
-
-
-
-const nowMinutes =
-timeToMinutes(currentTime);
-
-
-
-
-
-let targetSlot =
-(slot || "").toLowerCase();
-
-
-
-
-
-if(!targetSlot){
-
-
-if(
-Math.abs(
-nowMinutes -
-timeToMinutes("08:00")
-)<=1
-)
-
-targetSlot="asubuhi";
-
-
-
-else if(
-Math.abs(
-nowMinutes -
-timeToMinutes("14:00")
-)<=1
-)
-
-targetSlot="mchana";
-
-
-
-else if(
-Math.abs(
-nowMinutes -
-timeToMinutes("20:00")
-)<=1
-)
-
-targetSlot="jioni";
-
-
-}
-
-
-
-
-
-
-if(!targetSlot){
-
-
-return res.status(200).json({
-
-status:"waiting",
-
-currentTime,
-
-message:
-"Hakuna muda wa kutuma SMS"
-
-
-});
-
-
-}
-
-
-
-
-
-// ==========================
-// FILTER PATIENTS
-// ==========================
-
-
-
-const activePatients =
-reminders.filter(patient=>{
-
-
-if(
-patient.haliYaUkumbusho
-.toUpperCase()
-!=="ACTIVE"
-)
-
-return false;
-
-
-
-if(!patient.nambaSimu)
-return false;
-
-
-
-let patientTime;
-
-
-
-if(targetSlot==="asubuhi")
-patientTime=patient.mudaAsubuhi;
-
-
-if(targetSlot==="mchana")
-patientTime=patient.mudaMchana;
-
-
-if(targetSlot==="jioni")
-patientTime=patient.mudaJioni;
-
-
-
-if(!patientTime)
-return false;
-
-
-
-return (
-Math.abs(
-nowMinutes -
-timeToMinutes(patientTime)
-)<=1
-);
-
-
-
-});
-
-
+const snapshot =
+await db
+.collection("patient_reminders")
+.get();
 
 
 
 console.log(
-"Wagonjwa wa kutumwa:",
-activePatients.length
+"TOTAL REMINDERS:",
+snapshot.size
 );
 
 
 
-
-
-const results=[];
-
+let sent = 0;
 
 
 
-
-// ==========================
-// SEND SMS
-// ==========================
+for(const doc of snapshot.docs){
 
 
-for(const patient of activePatients){
+const reminder = doc.data();
 
 
 
-let phone =
-patient.nambaSimu
-.replace(/\D/g,'');
+const jina =
+reminder.jinaMgonjwa || "Mgonjwa";
+
+
+const simu =
+reminder.nambaSimu;
 
 
 
-if(phone.startsWith("0")){
+const hali =
+(reminder.haliYaUkumbusho || "")
+.toUpperCase();
 
-phone =
-"255"+phone.substring(1);
+
+
+// ===============================
+// CHECK STATUS
+// ===============================
+
+if(
+hali !== "HAI" &&
+hali !== "NDIO" &&
+hali !== "ACTIVE" &&
+hali !== "YES"
+){
+
+console.log(
+"Skipped:",
+jina,
+"Status:",
+hali
+);
+
+continue;
 
 }
 
 
 
-
-let slotName =
-targetSlot==="asubuhi"
-?"Asubuhi"
-:
-targetSlot==="mchana"
-?"Mchana"
-:
-"Jioni";
+// ===============================
+// CHECK DATE RANGE
+// ===============================
 
 
+if(
+today < reminder.tareheYaKuanza ||
+today > reminder.tareheYaKumaliza
+){
+
+console.log(
+"Out of date:",
+jina
+);
+
+continue;
+
+}
+
+
+
+// ===============================
+// CHECK TIME
+// ===============================
+
+
+const muda = [
+
+reminder.mudaAsubuhi,
+
+reminder.mudaMchana,
+
+reminder.mudaJioni
+
+];
+
+
+
+if(!muda.includes(currentTime)){
+
+continue;
+
+}
+
+
+
+// ===============================
+// CHECK PHONE
+// ===============================
+
+
+if(!simu){
+
+console.log(
+"Hakuna namba:",
+jina
+);
+
+continue;
+
+}
+
+
+
+// ===============================
+// SMS MESSAGE
+// ===============================
 
 
 const message =
 
-`Assalam Alaykum / Habari ${patient.jinaMgonjwa.toUpperCase()}.
+`Al-Furqan Herb's Clinic.
 
-Huu ni ukumbusho kutoka Al-Furqan Herb's Clinic.
+Habari ${jina},
 
-Kunywa dawa zako:
-${patient.dawaAlizopewa}
+Huu ni ukumbusho wako wa kutumia dawa:
 
-${patient.maelezoYaDawa}
+${reminder.dawaAlizopewa}
 
-Awamu:
-${slotName}
+Muda wa kutumia:
+${currentTime}
 
-Afya bora ni mtaji wako.`;
+Maelezo:
+${reminder.maelezoYaZiada || ""}
 
-
-
-
-
-try{
+Tunawatakia afya njema.`;
 
 
-const sms =
-await fetch(
-apiEndpoint,
-{
-
-method:"POST",
-
-headers:{
-
-"Content-Type":
-"application/json",
-
-"Authorization":
-`Bearer ${oasisKey}`
-
-},
 
 
-body:JSON.stringify({
+// ===============================
+// SEND SMS
+// ===============================
 
-to:phone,
 
-recipient:phone,
+const smsSent =
+await sendSMS(
+simu,
+message
+);
 
-message,
 
-sender:senderName
 
-})
+if(smsSent){
 
+
+sent++;
+
+
+
+await doc.ref.update({
+
+lastSentAt:
+new Date().toISOString(),
+
+lastSentTime:
+currentTime
 
 });
 
 
-
-
-const smsResult =
-await sms.json()
-.catch(()=>({}));
-
-
-
-results.push({
-
-patient:
-patient.jinaMgonjwa,
-
-phone,
-
-status:
-sms.ok
-?"success"
-:"failed",
-
-response:smsResult
-
-
-});
-
-
-
-
-}catch(e){
-
-
-results.push({
-
-patient:
-patient.jinaMgonjwa,
-
-status:"failed",
-
-error:e.message
-
-
-});
+console.log(
+"SMS SENT:",
+jina
+);
 
 
 }
 
 
+
 }
-
-
 
 
 
 return res.status(200).json({
 
-status:"completed",
+success:true,
 
-currentTime,
+message:
+"Cron imekamilika",
 
-slot:targetSlot,
+sent:sent,
 
-firestorePatients:
-reminders.length,
-
-totalPatients:
-activePatients.length,
-
-sent:
-results.filter(
-x=>x.status==="success"
-).length,
-
-results
-
+time:currentTime
 
 });
-
 
 
 
 }catch(error){
 
 
+console.error(error);
+
+
 return res.status(500).json({
 
-status:"error",
+success:false,
 
-message:error.message
+error:error.message
 
 });
 
