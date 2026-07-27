@@ -64,11 +64,15 @@ async function sendSMS(phone, message) {
 }
 
 // =====================================
-// TIME
+// TIME (EAT - East Africa Time / UTC+3)
 // =====================================
 
 function getCurrentTime() {
   const now = new Date();
+  
+  // Hubadilisha kwenda saa za Afrika Mashariki (EAT)
+  now.setHours(now.getHours() + 3);
+
   return (
     String(now.getHours()).padStart(2, "0") +
     ":" +
@@ -81,7 +85,9 @@ function getCurrentTime() {
 // =====================================
 
 function getToday() {
-  return new Date().toISOString().split("T")[0];
+  const now = new Date();
+  now.setHours(now.getHours() + 3);
+  return now.toISOString().split("T")[0];
 }
 
 // =====================================
