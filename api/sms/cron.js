@@ -140,16 +140,15 @@ export default async function handler(req, res) {
 
     const now = new Date();
 
-
-    const currentTime =
-      now.toLocaleTimeString(
-        'en-GB',
-        {
-          hour:'2-digit',
-          minute:'2-digit',
-          timeZone:'Africa/Dar_es_Salaam'
-        }
-      );
+const currentTime = now.toLocaleTimeString(
+  'en-GB',
+  {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Africa/Dar_es_Salaam'
+  }
+);
 
 
 
