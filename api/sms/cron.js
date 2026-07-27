@@ -69,9 +69,15 @@ await fetch(firestoreUrl);
 
 if(!fsResponse.ok){
 
+const errorText = await fsResponse.text();
+
 return res.status(500).json({
 
-error:"Firestore haijasomeka"
+error:"Firestore haijasomeka",
+
+statusCode: fsResponse.status,
+
+details:errorText
 
 });
 
