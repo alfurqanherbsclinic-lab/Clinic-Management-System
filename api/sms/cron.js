@@ -2,60 +2,106 @@
 
 import admin from "firebase-admin";
 
-// ===============================
-// FIREBASE CONNECTION
-// ===============================
+
+// =====================================
+// FIREBASE INITIALIZATION
+// =====================================
 
 if (!admin.apps.length) {
+
   admin.initializeApp({
+
     credential: admin.credential.cert({
+
       projectId: process.env.FIREBASE_PROJECT_ID,
+
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-    }),
+
+      privateKey: process.env.FIREBASE_PRIVATE_KEY
+        ?.replace(/\\n/g, "\n")
+
+    })
+
   });
+
 }
+
 
 const db = admin.firestore();
 
 
-// ===============================
-// SEND SMS FUNCTION (OASIS)
-// ===============================
+// =====================================
+// OASIS SMS FUNCTION
+// =====================================
 
 async function sendSMS(phone, message) {
 
   try {
 
+
     const response = await fetch(
-      "WEKA_OASIS_SMS_URL_HAPA",
+      "https://bulksms.oasistech.co.tz/api/sms",
       {
+
         method: "POST",
+
         headers: {
+
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.OASIS_API_KEY}`
+
+          "Authorization":
+          `Bearer ${process.env.OASIS_API_KEY}`
+
         },
 
+
         body: JSON.stringify({
-          phone: phone,
-          message: message
+
+          to: [
+            phone
+          ],
+
+          sender:
+          "AL-FURQAN",
+
+          message:
+          message
+
         })
 
       }
+
     );
 
 
     const result = await response.json();
 
-    console.log("SMS RESPONSE:", result);
+
+    console.log(
+      "OASIS RESPONSE:",
+      result
+    );
 
 
-    return true;
+    if(response.ok){
+
+      return true;
+
+    }
+
+
+    return false;
+
 
 
   } catch(error){
 
-    console.log("SMS ERROR:", error);
+
+    console.error(
+      "OASIS ERROR:",
+      error
+    );
+
 
     return false;
 
@@ -65,41 +111,80 @@ async function sendSMS(phone, message) {
 
 
 
-// ===============================
-// TIME FORMAT
-// ===============================
+// =====================================
+// TIME
+// =====================================
 
 function getCurrentTime(){
 
   const now = new Date();
 
-  const hour = String(now.getHours()).padStart(2,"0");
 
-  const minute = String(now.getMinutes()).padStart(2,"0");
+  return (
 
+    String(now.getHours())
+    .padStart(2,"0")
 
-  return `${hour}:${minute}`;
+    +
+
+    ":" +
+
+    String(now.getMinutes())
+    .padStart(2,"0")
+
+  );
 
 }
 
 
-// ===============================
-// DATE FORMAT
-// ===============================
+
+// =====================================
+// DATE
+// =====================================
 
 function getToday(){
 
- const now = new Date();
-
- return now.toISOString().split("T")[0];
+  return new Date()
+  .toISOString()
+  .split("T")[0];
 
 }
 
 
 
-// ===============================
-// MAIN CRON HANDLER
-// ===============================
+// =====================================
+// NORMALIZE PHONE
+// =====================================
+
+function formatPhone(phone){
+
+
+  if(!phone)
+    return null;
+
+
+  phone =
+  phone.replace(/\s+/g,"");
+
+
+  if(phone.startsWith("0")){
+
+    phone =
+    "255" +
+    phone.substring(1);
+
+  }
+
+
+  return phone;
+
+}
+
+
+
+// =====================================
+// CRON HANDLER
+// =====================================
 
 export default async function handler(req,res){
 
@@ -107,15 +192,21 @@ export default async function handler(req,res){
 try{
 
 
-const currentTime = getCurrentTime();
+const currentTime =
+getCurrentTime();
 
-const today = getToday();
+
+const today =
+getToday();
 
 
 
 console.log(
-"CHECK TIME:",
-currentTime
+"CRON START:",
+{
+time:currentTime,
+date:today
+}
 );
 
 
@@ -141,42 +232,54 @@ let sent = 0;
 for(const doc of snapshot.docs){
 
 
-const reminder = doc.data();
+
+const reminder =
+doc.data();
 
 
 
 const jina =
-reminder.jinaMgonjwa || "Mgonjwa";
-
-
-const simu =
-reminder.nambaSimu;
+reminder.jinaMgonjwa ||
+"Mgonjwa";
 
 
 
-const hali =
-(reminder.haliYaUkumbusho || "")
+const phone =
+formatPhone(
+reminder.nambaSimu
+);
+
+
+
+const status =
+String(
+reminder.haliYaUkumbusho || ""
+)
 .toUpperCase();
 
 
 
-// ===============================
-// CHECK STATUS
-// ===============================
-
-if(
-hali !== "HAI" &&
-hali !== "NDIO" &&
-hali !== "ACTIVE" &&
-hali !== "YES"
-){
-
 console.log(
-"Skipped:",
+"CHECK:",
 jina,
-"Status:",
-hali
+status
 );
+
+
+
+// STATUS CHECK
+
+if(
+
+status !== "ACTIVE" &&
+
+status !== "HAI" &&
+
+status !== "NDIO" &&
+
+status !== "YES"
+
+){
 
 continue;
 
@@ -184,20 +287,29 @@ continue;
 
 
 
-// ===============================
-// CHECK DATE RANGE
-// ===============================
+// DATE CHECK
+
+if(
+
+reminder.tareheYaKuanza &&
+
+today < reminder.tareheYaKuanza
+
+){
+
+continue;
+
+}
+
 
 
 if(
-today < reminder.tareheYaKuanza ||
-today > reminder.tareheYaKumaliza
-){
 
-console.log(
-"Out of date:",
-jina
-);
+reminder.tareheYaKumaliza &&
+
+today > reminder.tareheYaKumaliza
+
+){
 
 continue;
 
@@ -205,12 +317,9 @@ continue;
 
 
 
-// ===============================
-// CHECK TIME
-// ===============================
+// TIME CHECK
 
-
-const muda = [
+const times = [
 
 reminder.mudaAsubuhi,
 
@@ -222,7 +331,11 @@ reminder.mudaJioni
 
 
 
-if(!muda.includes(currentTime)){
+if(
+
+!times.includes(currentTime)
+
+){
 
 continue;
 
@@ -230,15 +343,12 @@ continue;
 
 
 
-// ===============================
-// CHECK PHONE
-// ===============================
+// PHONE CHECK
 
-
-if(!simu){
+if(!phone){
 
 console.log(
-"Hakuna namba:",
+"Hakuna simu:",
 jina
 );
 
@@ -248,22 +358,45 @@ continue;
 
 
 
-// ===============================
-// SMS MESSAGE
-// ===============================
+// DUPLICATE CHECK
+
+
+if(
+
+reminder.lastSentTime === currentTime
+
+&&
+
+reminder.lastSentDate === today
+
+){
+
+console.log(
+"Already sent:",
+jina
+);
+
+continue;
+
+}
+
+
+
+// MESSAGE
 
 
 const message =
 
-`Al-Furqan Herb's Clinic.
+`Al-Furqan Herb's Clinic
 
 Habari ${jina},
 
-Huu ni ukumbusho wako wa kutumia dawa:
+Huu ni ukumbusho wako wa kutumia dawa.
 
-${reminder.dawaAlizopewa}
+Dawa:
+${reminder.dawaAlizopewa || ""}
 
-Muda wa kutumia:
+Muda:
 ${currentTime}
 
 Maelezo:
@@ -274,20 +407,18 @@ Tunawatakia afya njema.`;
 
 
 
-// ===============================
 // SEND SMS
-// ===============================
 
 
-const smsSent =
+const result =
 await sendSMS(
-simu,
+phone,
 message
 );
 
 
 
-if(smsSent){
+if(result){
 
 
 sent++;
@@ -296,19 +427,26 @@ sent++;
 
 await doc.ref.update({
 
-lastSentAt:
-new Date().toISOString(),
-
 lastSentTime:
-currentTime
+currentTime,
+
+lastSentDate:
+today,
+
+lastSentAt:
+new Date()
+.toISOString()
 
 });
 
 
+
 console.log(
 "SMS SENT:",
-jina
+jina,
+phone
 );
+
 
 
 }
@@ -326,18 +464,28 @@ success:true,
 message:
 "Cron imekamilika",
 
-sent:sent,
+sent,
 
-time:currentTime
+time:
+currentTime,
+
+date:
+today
 
 });
 
 
 
-}catch(error){
+}
+
+catch(error){
 
 
-console.error(error);
+console.error(
+"CRON ERROR:",
+error
+);
+
 
 
 return res.status(500).json({
@@ -352,4 +500,4 @@ error:error.message
 }
 
 
-  }
+}
