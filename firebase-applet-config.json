@@ -1,12 +1,12 @@
 {
-  "projectId": "circular-simplicity-kdw77",
-  "appId": "1:1077956963268:web:b35fa32277f186c0681291",
-  "apiKey": "AIzaSyDLLArcKsFU8OkOy8xZ3UNxGksD2jZWS7Y",
-  "authDomain": "circular-simplicity-kdw77.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-taaag3patientman-e756b5a4-7e45-4138-aa76-eec9c50dc039",
-  "storageBucket": "circular-simplicity-kdw77.firebasestorage.app",
-  "messagingSenderId": "1077956963268",
-  "measurementId": "",
-  "oAuthClientId": "1077956963268-h3ii7hof4n9bm4mpk1ttn3fjakbn7urp.apps.googleusercontent.com",
+  "projectId": "al-furqan-clinic-test",
+  "appId": "1:821227327162:web:f3af3b64848b849917bc83",
+  "apiKey": "AIzaSyC4KWuR7-L5CFrfOOkZoUWCX0aP_He2nc4",
+  "authDomain": "al-furqan-clinic-test.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "al-furqan-clinic-test.firebasestorage.app",
+  "messagingSenderId": "821227327162",
+  "measurementId": "G-MGY8E2REWK",
+  "oAuthClientId": "",
   "recaptchaSiteKey": ""
 }
