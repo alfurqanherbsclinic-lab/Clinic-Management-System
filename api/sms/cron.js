@@ -150,6 +150,8 @@ const currentTime = now.toLocaleTimeString(
   }
 );
 
+console.log("Muda wa Tanzania:", currentTime);
+
 
 
     let targetSlot =
