@@ -1,494 +1,538 @@
 export default async function handler(req, res) {
 
-  // CORS
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+res.setHeader('Access-Control-Allow-Origin','*');
+res.setHeader('Access-Control-Allow-Methods','GET,POST,OPTIONS');
+res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');
 
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+if(req.method==="OPTIONS"){
+ return res.status(200).end();
+}
 
 
-  try {
+try{
 
-    const {
-      slot,
-      apiKey,
-      baseUrl,
-      sender
-    } = req.query || {};
 
+const {
+slot,
+apiKey,
+baseUrl,
+sender
+}=req.query || {};
 
-    // ==============================
-    // OASIS SETTINGS
-    // ==============================
 
-    const oasisKey =
-      apiKey ||
-      req.body?.apiKey ||
-      process.env.OASIS_API_KEY ||
-      'e97eb6eb-02cd-41e9-913a-ff1e76b6e4b8';
 
+const oasisKey =
+apiKey ||
+process.env.OASIS_API_KEY ||
+"e97eb6eb-02cd-41e9-913a-ff1e76b6e4b8";
 
-    const senderName =
-      sender ||
-      req.body?.sender ||
-      'AHC MKONONI';
 
+const senderName =
+sender ||
+"AHC MKONONI";
 
-    const apiEndpoint =
-      baseUrl ||
-      process.env.OASIS_URL ||
-      'https://bulksms.oasistech.co.tz/api/sms';
 
+const apiEndpoint =
+baseUrl ||
+"https://bulksms.oasistech.co.tz/api/sms";
 
 
-    // ==============================
-    // FIRESTORE
-    // ==============================
 
-    const projectId =
-      "circular-simplicity-kdw77";
+const projectId =
+"circular-simplicity-kdw77";
 
 
-    const firestoreUrl =
-      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/patient_reminders`;
+const firestoreUrl =
+`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/patient_reminders`;
 
 
-    const historyUrl =
-      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/sms_history`;
 
+const historyUrl =
+`https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/sms_history`;
 
 
-    let reminders = [];
 
 
 
-    // Fetch Patients
+// ==========================
+// FIRESTORE READ
+// ==========================
 
-    const fsResponse = await fetch(firestoreUrl);
 
+let reminders=[];
 
-    if(fsResponse.ok){
 
-      const data = await fsResponse.json();
+const fsResponse =
+await fetch(firestoreUrl);
 
 
-      const docs = data.documents || [];
+if(!fsResponse.ok){
 
+return res.status(500).json({
 
+error:"Firestore haijasomeka"
 
-      for(const doc of docs){
+});
 
+}
 
-        const f = doc.fields || {};
 
 
-        reminders.push({
+const fsData =
+await fsResponse.json();
 
-          id: doc.name,
 
-          jinaMgonjwa:
-            f.jinaMgonjwa?.stringValue || "Mgonjwa",
+const docs =
+fsData.documents || [];
 
 
-          nambaSimu:
-            f.nambaSimu?.stringValue || "",
 
-
-          dawaAlizopewa:
-            f.dawaAlizopewa?.stringValue || "Dawa",
-
-
-          maelezoYaDawa:
-            f.maelezoYaDawa?.stringValue ||
-            f.maelezoYaZiada?.stringValue ||
-            "",
-
-
-          haliYaUkumbusho:
-            f.haliYaUkumbusho?.stringValue || "ACTIVE",
-
-
-          mudaAsubuhi:
-            f.mudaAsubuhi?.stringValue || "08:00",
-
-
-          mudaMchana:
-            f.mudaMchana?.stringValue || "14:00",
-
-
-          mudaJioni:
-            f.mudaJioni?.stringValue || "20:00"
-
-        });
-
-
-      }
-
-    }
-
-
-
-    // ==============================
-    // CHECK CURRENT TIME
-    // ==============================
-
-
-    const now = new Date();
-
-const currentTime = now.toLocaleTimeString(
-  'en-GB',
-  {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Africa/Dar_es_Salaam'
-  }
+console.log(
+"Firestore patients:",
+docs.length
 );
 
-console.log("Muda wa Tanzania:", currentTime);
 
 
+for(const doc of docs){
 
-    let targetSlot =
-      (slot || "").toLowerCase();
 
+const f =
+doc.fields || {};
 
 
-    if(!targetSlot){
+reminders.push({
 
-      if(currentTime === "08:00")
-        targetSlot="asubuhi";
 
+id:doc.name,
 
-      else if(currentTime === "14:00")
-        targetSlot="mchana";
 
+jinaMgonjwa:
+f.jinaMgonjwa?.stringValue || "Mgonjwa",
 
-      else if(currentTime === "20:00")
-        targetSlot="jioni";
 
+nambaSimu:
+f.nambaSimu?.stringValue || "",
 
-      else
-        targetSlot="";
 
-    }
+dawaAlizopewa:
+f.dawaAlizopewa?.stringValue || "Dawa",
 
 
+maelezoYaDawa:
+f.maelezoYaDawa?.stringValue || "",
 
-    if(!targetSlot){
 
-      return res.status(200).json({
+haliYaUkumbusho:
+f.haliYaUkumbusho?.stringValue || "ACTIVE",
 
-        status:"waiting",
 
-        message:
-        "Hakuna ratiba ya kutuma SMS kwa muda huu",
+mudaAsubuhi:
+f.mudaAsubuhi?.stringValue || "08:00",
 
-        currentTime
 
-      });
+mudaMchana:
+f.mudaMchana?.stringValue || "14:00",
 
-    }
 
+mudaJioni:
+f.mudaJioni?.stringValue || "20:00"
 
 
-    // ==============================
-    // FILTER ACTIVE PATIENTS
-    // ==============================
+});
 
 
-    const activePatients =
-      reminders.filter(patient=>{
+}
 
 
-        if(patient.haliYaUkumbusho !== "ACTIVE")
-          return false;
 
 
-        if(!patient.nambaSimu)
-          return false;
 
+// ==========================
+// TIME TANZANIA
+// ==========================
 
 
-        if(targetSlot==="asubuhi")
-          return patient.mudaAsubuhi === currentTime;
+const now =
+new Date();
 
 
-        if(targetSlot==="mchana")
-          return patient.mudaMchana === currentTime;
+const currentTime =
+now.toLocaleTimeString(
+'en-GB',
+{
+hour:'2-digit',
+minute:'2-digit',
+hour12:false,
+timeZone:'Africa/Dar_es_Salaam'
+});
 
 
-        if(targetSlot==="jioni")
-          return patient.mudaJioni === currentTime;
+console.log(
+"Muda Tanzania:",
+currentTime
+);
 
 
 
-        return false;
 
+// dakika ya sasa
 
-      });
+function timeToMinutes(time){
 
+const parts =
+time.split(":");
 
+return Number(parts[0])*60 +
+Number(parts[1]);
 
-    const results=[];
+}
 
 
 
-    // ==============================
-    // SEND SMS
-    // ==============================
+const nowMinutes =
+timeToMinutes(currentTime);
 
 
-    for(const patient of activePatients){
 
 
-      let phone =
-      patient.nambaSimu.replace(/[^\d]/g,"");
 
+let targetSlot =
+(slot || "").toLowerCase();
 
 
-      if(phone.startsWith("0")){
 
-        phone =
-        "255"+phone.substring(1);
 
-      }
 
+if(!targetSlot){
 
 
-      let slotName =
-      targetSlot==="asubuhi"
-      ? "Asubuhi"
-      :
-      targetSlot==="mchana"
-      ? "Mchana"
-      :
-      "Jioni";
+if(
+Math.abs(
+nowMinutes -
+timeToMinutes("08:00")
+)<=1
+)
 
+targetSlot="asubuhi";
 
 
-      const message =
+
+else if(
+Math.abs(
+nowMinutes -
+timeToMinutes("14:00")
+)<=1
+)
+
+targetSlot="mchana";
+
+
+
+else if(
+Math.abs(
+nowMinutes -
+timeToMinutes("20:00")
+)<=1
+)
+
+targetSlot="jioni";
+
+
+}
+
+
+
+
+
+
+if(!targetSlot){
+
+
+return res.status(200).json({
+
+status:"waiting",
+
+currentTime,
+
+message:
+"Hakuna muda wa kutuma SMS"
+
+
+});
+
+
+}
+
+
+
+
+
+// ==========================
+// FILTER PATIENTS
+// ==========================
+
+
+
+const activePatients =
+reminders.filter(patient=>{
+
+
+if(
+patient.haliYaUkumbusho
+.toUpperCase()
+!=="ACTIVE"
+)
+
+return false;
+
+
+
+if(!patient.nambaSimu)
+return false;
+
+
+
+let patientTime;
+
+
+
+if(targetSlot==="asubuhi")
+patientTime=patient.mudaAsubuhi;
+
+
+if(targetSlot==="mchana")
+patientTime=patient.mudaMchana;
+
+
+if(targetSlot==="jioni")
+patientTime=patient.mudaJioni;
+
+
+
+if(!patientTime)
+return false;
+
+
+
+return (
+Math.abs(
+nowMinutes -
+timeToMinutes(patientTime)
+)<=1
+);
+
+
+
+});
+
+
+
+
+
+console.log(
+"Wagonjwa wa kutumwa:",
+activePatients.length
+);
+
+
+
+
+
+const results=[];
+
+
+
+
+
+// ==========================
+// SEND SMS
+// ==========================
+
+
+for(const patient of activePatients){
+
+
+
+let phone =
+patient.nambaSimu
+.replace(/\D/g,'');
+
+
+
+if(phone.startsWith("0")){
+
+phone =
+"255"+phone.substring(1);
+
+}
+
+
+
+
+let slotName =
+targetSlot==="asubuhi"
+?"Asubuhi"
+:
+targetSlot==="mchana"
+?"Mchana"
+:
+"Jioni";
+
+
+
+
+const message =
 
 `Assalam Alaykum / Habari ${patient.jinaMgonjwa.toUpperCase()}.
 
 Huu ni ukumbusho kutoka Al-Furqan Herb's Clinic.
 
-Tafadhali kunywa dawa zako:
+Kunywa dawa zako:
 ${patient.dawaAlizopewa}
 
-${patient.maelezoYaDawa ?
-"Maelezo: "+patient.maelezoYaDawa :
-""}
+${patient.maelezoYaDawa}
 
-Awamu: ${slotName}
+Awamu:
+${slotName}
 
 Afya bora ni mtaji wako.`;
 
 
 
 
-      try{
 
+try{
 
-        const smsResponse =
-        await fetch(apiEndpoint,{
 
+const sms =
+await fetch(
+apiEndpoint,
+{
 
-          method:"POST",
+method:"POST",
 
+headers:{
 
-          headers:{
+"Content-Type":
+"application/json",
 
-            "Content-Type":"application/json",
+"Authorization":
+`Bearer ${oasisKey}`
 
-            "Authorization":
-            `Bearer ${oasisKey}`
+},
 
-          },
 
+body:JSON.stringify({
 
-          body:JSON.stringify({
+to:phone,
 
-            to:phone,
+recipient:phone,
 
-            recipient:phone,
+message,
 
-            message,
+sender:senderName
 
-            text:message,
+})
 
-            sender:senderName,
 
-            from:senderName,
+});
 
-            sender_id:senderName
 
 
-          })
 
+const smsResult =
+await sms.json()
+.catch(()=>({}));
 
-        });
 
 
+results.push({
 
-        const smsData =
-        await smsResponse.json()
-        .catch(()=>({}));
+patient:
+patient.jinaMgonjwa,
 
+phone,
 
+status:
+sms.ok
+?"success"
+:"failed",
 
+response:smsResult
 
-        results.push({
 
-          patient:
-          patient.jinaMgonjwa,
+});
 
-          phone,
 
-          slot:slotName,
 
-          status:
-          smsResponse.ok
-          ?
-          "success"
-          :
-          "failed",
 
-          response:smsData
+}catch(e){
 
-        });
 
+results.push({
 
+patient:
+patient.jinaMgonjwa,
 
-        // Save History
+status:"failed",
 
-        await fetch(historyUrl,{
+error:e.message
 
-          method:"POST",
 
-          headers:{
-          "Content-Type":"application/json"
-          },
+});
 
 
-          body:JSON.stringify({
+}
 
-            fields:{
 
+}
 
-              jinaMgonjwa:{
-              stringValue:
-              patient.jinaMgonjwa
-              },
 
 
-              simu:{
-              stringValue:phone
-              },
 
 
-              ujumbe:{
-              stringValue:message
-              },
+return res.status(200).json({
 
+status:"completed",
 
-              slot:{
-              stringValue:slotName
-              },
+currentTime,
 
+slot:targetSlot,
 
-              tarehe:{
-              stringValue:
-              new Date().toISOString()
-              },
+firestorePatients:
+reminders.length,
 
+totalPatients:
+activePatients.length,
 
-              status:{
-              stringValue:
-              "SENT"
-              }
+sent:
+results.filter(
+x=>x.status==="success"
+).length,
 
+results
 
-            }
 
+});
 
-          })
 
 
-        });
 
+}catch(error){
 
 
-      }catch(error){
+return res.status(500).json({
 
+status:"error",
 
-        results.push({
+message:error.message
 
-          patient:
-          patient.jinaMgonjwa,
+});
 
-          phone,
 
-          status:"failed",
+}
 
-          error:error.message
 
-        });
-
-
-      }
-
-
-
-    }
-
-
-
-
-    return res.status(200).json({
-
-      status:"completed",
-
-      currentTime,
-
-      slot:targetSlot,
-
-      totalPatients:
-      activePatients.length,
-
-
-      sent:
-      results.filter(
-        r=>r.status==="success"
-      ).length,
-
-
-      results
-
-
-    });
-
-
-
-  }
-
-  catch(error){
-
-
-    return res.status(500).json({
-
-      status:"error",
-
-      message:error.message
-
-    });
-
-
-  }
-
-              }
+}
