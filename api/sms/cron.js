@@ -41,7 +41,7 @@ async function sendSMS(phone, message) {
         },
         body: JSON.stringify({
           to: [phone],
-          sender: "AL-FURQAN",
+          sender: "AHC MKONONI",
           message: message
         })
       }
@@ -233,4 +233,3 @@ Tunawatakia afya njema.`;
     });
   }
 }
-
