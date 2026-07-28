@@ -13,7 +13,7 @@ import {
   PlusCircle,
   LogIn,
   Users,
-  Fingerprint as BioIcon
+  X
 } from "lucide-react";
 
 interface LoginScreenProps {
@@ -22,16 +22,57 @@ interface LoginScreenProps {
   onIncrementAttempts: () => void;
 }
 
-// Orodha ya awali ya Wafanyakazi wa Ofisi (Kama hakuna kwenye localStorage)
+// Map ya majina ya vidole vilivyosajiliwa
+const FINGER_OPTIONS: { [key: string]: string } = {
+  RIGHT_THUMB: "Kidole cha Gumba cha Kuume (Right Thumb)",
+  RIGHT_INDEX: "Kidole cha Shahada cha Kuume (Right Index)",
+  RIGHT_MIDDLE: "Kidole cha Kati cha Kuume (Right Middle)",
+  LEFT_THUMB: "Kidole cha Gumba cha Kushoto (Left Thumb)",
+  LEFT_INDEX: "Kidole cha Shahada cha Kushoto (Left Index)"
+};
+
+// Orodha ya awali ya Wafanyakazi wa Ofisi na alama zao mahususi za vidole
 const DEFAULT_STAFF = [
-  { id: "abdu", name: "Abdu Khalifa", username: "abdu.khalifa", role: "Administrator", roleDisplay: "Msimamizi Mkuu", bioId: "FP-8842-KHA", fingerCode: "fingerprint_thumb_abdu" },
-  { id: "yusuf", name: "Dr. Yusuf Hamis", username: "daktari", role: "Doctor", roleDisplay: "Daktari (Doctor)", bioId: "FP-4412-YUS", fingerCode: "fingerprint_index_yusuf" },
-  { id: "fatma", name: "Fatma Ali", username: "famasia", role: "Pharmacist", roleDisplay: "Mfamasia (Pharmacist)", bioId: "FP-3389-FAT", fingerCode: "fingerprint_middle_fatma" }
+  { 
+    id: "abdu", 
+    name: "Abdu Khalifa", 
+    username: "abdu.khalifa", 
+    role: "Administrator", 
+    roleDisplay: "Msimamizi Mkuu", 
+    bioId: "FP-8842-KHA", 
+    fingerCode: "RIGHT_THUMB", 
+    fingerName: "Kidole cha Gumba cha Kuume (Right Thumb)" 
+  },
+  { 
+    id: "yusuf", 
+    name: "Dr. Yusuf Hamis", 
+    username: "daktari", 
+    role: "Doctor", 
+    roleDisplay: "Daktari (Doctor)", 
+    bioId: "FP-4412-YUS", 
+    fingerCode: "RIGHT_INDEX", 
+    fingerName: "Kidole cha Shahada cha Kuume (Right Index)" 
+  },
+  { 
+    id: "fatma", 
+    name: "Fatma Ali", 
+    username: "famasia", 
+    role: "Pharmacist", 
+    roleDisplay: "Mfamasia (Pharmacist)", 
+    bioId: "FP-3389-FAT", 
+    fingerCode: "RIGHT_MIDDLE", 
+    fingerName: "Kidole cha Kati cha Kuume (Right Middle)" 
+  }
 ];
 
 export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttempts }: LoginScreenProps) {
   // Navigation tabs
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
+
+  // Admin Authentication Modal for Inner Registration (Admin Only)
+  const [showAdminAuthModal, setShowAdminAuthModal] = useState(false);
+  const [adminAuthPassword, setAdminAuthPassword] = useState("");
+  const [adminAuthError, setAdminAuthError] = useState("");
 
   // Authentication states
   const [username, setUsername] = useState("");
@@ -48,19 +89,20 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
   // Biometric Database (localStorage)
   const [registeredStaff, setRegisteredStaff] = useState<any[]>([]);
   
-  // Registration States (Sehemu Maalumu ya Usajili)
+  // Registration States (Usajili wa Ndani - Admin Only)
   const [regName, setRegName] = useState("");
   const [regUsername, setRegUsername] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regRole, setRegRole] = useState("Doctor");
+  const [regFingerType, setRegFingerType] = useState("RIGHT_THUMB");
   const [regScanning, setRegScanning] = useState(false);
   const [regBiometricKey, setRegBiometricKey] = useState("");
   const [regBiometricRegistered, setRegBiometricRegistered] = useState(false);
   const [regSuccessMsg, setRegSuccessMsg] = useState("");
   const [regErrorMsg, setRegErrorMsg] = useState("");
 
-  // Biometric Login States
-  const [selectedFingerSource, setSelectedFingerSource] = useState(""); // Ni kidole gani kimewekwa?
+  // Biometric Login States (Udhibiti wa Kidole)
+  const [selectedFingerAttempt, setSelectedFingerAttempt] = useState(""); // Ni jaribio gani la kidole linawekwa
   const [biometricScanning, setBiometricScanning] = useState(false);
   const [biometricStatus, setBiometricStatus] = useState("");
   const [scanSuccess, setScanSuccess] = useState(false);
@@ -86,7 +128,27 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
     }
   }, []);
 
-  // Hifadhi usajili mpya wa mfanyakazi na Biometric yake
+  // Kufungua sehemu ya usajili baada ya kuthibitisha Msimamizi Mkuu (Admin)
+  const handleOpenRegisterTab = () => {
+    setAdminAuthPassword("");
+    setAdminAuthError("");
+    setShowAdminAuthModal(true);
+  };
+
+  // Kuhakiki nywila ya Admin kabla ya kumpa fursa ya kusajili mfanyakazi
+  const handleVerifyAdminAccess = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminAuthPassword === "123456" || adminAuthPassword.toLowerCase() === "admin") {
+      setShowAdminAuthModal(false);
+      setActiveTab("register");
+      setRegErrorMsg("");
+      setRegSuccessMsg("");
+    } else {
+      setAdminAuthError("ðŸš« Neno la siri la Msimamizi si sahihi! Usajili unaruhusiwa kwa Admin pekee.");
+    }
+  };
+
+  // Hifadhi usajili mpya wa mfanyakazi na Alama ya Kidole Mahususi
   const handleRegisterBiometrics = (e: React.FormEvent) => {
     e.preventDefault();
     setRegErrorMsg("");
@@ -98,7 +160,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
     }
 
     if (!regBiometricRegistered) {
-      setRegErrorMsg("Tafadhali kwanza gusa kitufe cha fingerprint hapo chini ili kusajili alama yako ya kidole kwenye mfumo.");
+      setRegErrorMsg("Tafadhali kwanza gusa kitufe cha fingerprint hapo chini ili kusajili alama ya kidole hicho mahususi.");
       return;
     }
 
@@ -118,6 +180,8 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
     if (regRole === "Cashier") roleDisplay = "Mhasibu / Cashier";
     if (regRole === "Receptionist") roleDisplay = "Mapokezi / Receptionist";
 
+    const fingerNameText = FINGER_OPTIONS[regFingerType] || "Kidole cha Gumba";
+
     const newStaff = {
       id: "staff_" + Date.now(),
       name: regName,
@@ -125,7 +189,8 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
       role: regRole,
       roleDisplay: roleDisplay,
       bioId: regBiometricKey,
-      fingerCode: "fingerprint_" + regUsername
+      fingerCode: regFingerType,
+      fingerName: fingerNameText
     };
 
     const updatedList = [...registeredStaff, newStaff];
@@ -133,10 +198,9 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
     setRegisteredStaff(updatedList);
 
     // Safisha fomu na urudi kwenye login
-    setRegSuccessMsg(`Hongera! ${regName} amesajiliwa kikamilifu na Biometric ID yake: ${regBiometricKey}`);
+    setRegSuccessMsg(`Hongera! ${regName} amesajiliwa kikamilifu. Kidole kilichoruhusiwa: ${fingerNameText} (ID: ${regBiometricKey})`);
     
     setTimeout(() => {
-      // Rudi kwenye tab ya login na uweke username moja kwa moja
       setUsername(regUsername);
       setRole(regRole);
       setActiveTab("login");
@@ -148,7 +212,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
       setRegBiometricRegistered(false);
       setRegBiometricKey("");
       setRegSuccessMsg("");
-    }, 3000);
+    }, 3500);
   };
 
   // Simulates fingerprint acquisition process for new registration
@@ -186,10 +250,8 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
     setLoading(true);
 
     setTimeout(() => {
-      // Tafuta mfanyakazi kwenye database yetu ya biometric pia
       const dbStaff = registeredStaff.find(s => s.username.toLowerCase() === username.toLowerCase());
       
-      // Validation (Tunaruhusu nywila '123456' kwa demo pia)
       const isValidAdmin = username.toLowerCase() === "admin" && password === "123456";
       const isValidDoctor = username.toLowerCase() === "daktari" && password === "dawa123";
       const isValidPharmacist = username.toLowerCase() === "famasia" && password === "famasia123";
@@ -224,7 +286,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
     }, 1200);
   };
 
-  // Uhakiki thabiti wa Alama ya Kidole uliyochagua
+  // Udhibiti Madhubuti wa Alama ya Kidole (Strict Fingerprint Verification)
   const handleBiometricLogin = () => {
     setBiometricError("");
     setBiometricStatus("");
@@ -235,53 +297,62 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
       return;
     }
 
-    // Lazima kidole gani kinawekwa kieleweke kwenye simulator
-    if (!selectedFingerSource) {
-      setBiometricError("Mfumo hauwezi kutambua kidole! Tafadhali chagua ni nani anaye weka kidole chake kwenye mashine (Select Finger Source) ili kuanza.");
+    if (!selectedFingerAttempt) {
+      setBiometricError("Mfumo hauwezi kutambua kidole! Tafadhali chagua alama ya kidole inayowekwa kwenye scanner ili kuanza.");
       return;
     }
 
     setBiometricScanning(true);
-    setBiometricStatus("Scanning fingerprint... Weka na ushikilie kidole chako.");
+    setBiometricStatus("Scanning fingerprint... Weka na ushikilie kidole chako kwenye kifaa.");
 
-    // Simulation halisi ya kusoma kidole na kulinganisha na Database ya Ofisi
     setTimeout(() => {
       
-      if (selectedFingerSource === "unauthorized_finger") {
-        // Kidole cha mtu asiye rasmi/hajasajiliwa kabisa
-        setBiometricStatus("Uhakiki umeanza... Inatafuta kwenye Database.");
+      // 1. Mtu kigeni / Kidole kisichosajiliwa
+      if (selectedFingerAttempt === "unauthorized_finger") {
+        setBiometricStatus("Uhakiki umeanza... Inatafuta kwenye Database...");
         
         setTimeout(() => {
           setBiometricScanning(false);
           setScanSuccess(false);
           onIncrementAttempts();
-          setBiometricError("❌ ALAMA YA KIDOLE HAIJASAJILIWA! Access Denied. Mtu huyu hana ruhusa ya kuingia kwenye mfumo wa Al-Furqan.");
+          setBiometricError("âŒ ALAMA YA KIDOLE HAIJASAJILIWA! Access Denied. Alama hii haipo kwenye mfumo wa Al-Furqan.");
           setBiometricStatus("");
         }, 1500);
 
       } else {
-        // Kidole kilichosajiliwa kimefanikiwa kulinganishwa na profile halisi
-        const staff = registeredStaff.find(s => s.id === selectedFingerSource);
-        
+        // Parse staffId na status ya kidole
+        const [staffId, fingerMatchStatus] = selectedFingerAttempt.split(":");
+        const staff = registeredStaff.find(s => s.id === staffId);
+
         if (!staff) {
           setBiometricScanning(false);
-          setBiometricError("Mtumiaji aliyepachikwa hajatambuliwa!");
+          setBiometricError("Mtumiaji hajatambuliwa!");
           return;
         }
 
-        setBiometricStatus(`Kusoma alama ya kidole ya ${staff.name}...`);
-        
+        setBiometricStatus(`Inasoma vipimo vya kidole kinachowekwa...`);
+
         setTimeout(() => {
-          setBiometricStatus(`Inalinganisha vipimo na Biometric Hash: ${staff.bioId}...`);
-          
+          setBiometricStatus(`Inalinganisha na alama iliyosajiliwa (${staff.fingerName || "Kidole cha Gumba"})...`);
+
           setTimeout(() => {
-            setBiometricScanning(false);
-            setScanSuccess(true);
-            setBiometricStatus(`Imethibitishwa! Karibu ${staff.name} (${staff.roleDisplay})`);
-            
-            setTimeout(() => {
-              onLoginSuccess(staff.username, staff.roleDisplay);
-            }, 800);
+            if (fingerMatchStatus === "WRONG") {
+              // Kidole Kingine Tofauti (Strict Rejection)
+              setBiometricScanning(false);
+              setScanSuccess(false);
+              onIncrementAttempts();
+              setBiometricError(`âŒ ALAMA YA KIDOLE HAIINGILIANI! Kidole hiki sicho kilichosajiliwa kwa mtumiaji (${staff.name}). Kidole chake pekee kinachokubalika ni: [${staff.fingerName || "Kidole Kilichosajiliwa"}]. Access Denied!`);
+              setBiometricStatus("");
+            } else {
+              // Kidole Sahihi Kilichosajiliwa Pekee Ndio Kinaruhusiwa
+              setBiometricScanning(false);
+              setScanSuccess(true);
+              setBiometricStatus(`âœ… ALAMA YA KIDOLE IMEINGILIANA SAHIHI! Karibu ${staff.name} (${staff.roleDisplay})`);
+              
+              setTimeout(() => {
+                onLoginSuccess(staff.username, staff.roleDisplay);
+              }, 800);
+            }
           }, 1200);
         }, 1200);
       }
@@ -310,9 +381,76 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
       <div className="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#D6145A]/5 blur-3xl pointer-events-none" />
       <div className="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-[#D6145A]/5 blur-3xl pointer-events-none" />
 
+      {/* Admin Authentication Modal for Inner Registration */}
+      {showAdminAuthModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[10000] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl border border-slate-200 relative animate-in fade-in zoom-in-95">
+            <button 
+              onClick={() => setShowAdminAuthModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-[#D6145A]/10 flex items-center justify-center text-[#D6145A]">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Usajili wa Ndani (Admin Only)</h3>
+                <p className="text-[11px] text-slate-500 font-medium">Thibitisha nywila ya Admin ili kusajili mtumiaji mpya.</p>
+              </div>
+            </div>
+
+            {adminAuthError && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-xl text-xs font-semibold mb-3 flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 shrink-0 text-rose-600" />
+                <span>{adminAuthError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleVerifyAdminAccess} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                  Neno la Siri la Msimamizi Mkuu (Admin Password)
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="password"
+                    autoFocus
+                    required
+                    value={adminAuthPassword}
+                    onChange={(e) => setAdminAuthPassword(e.target.value)}
+                    placeholder="Weka nywila (mf. 123456)"
+                    className="w-full p-2.5 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-[#D6145A]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdminAuthModal(false)}
+                  className="w-1/2 p-2.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 cursor-pointer"
+                >
+                  Ghairi
+                </button>
+                <button
+                  type="submit"
+                  className="w-1/2 p-2.5 bg-[#D6145A] text-white text-xs font-bold rounded-xl hover:bg-[#b00f48] shadow-sm cursor-pointer"
+                >
+                  Thibitisha Admin
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-4xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col justify-between relative z-10">
         
-        {/* Navigation Tabs at top to switch between Login and Register Biometrics */}
+        {/* Navigation Tabs at top */}
         <div className="bg-slate-50 border-b border-slate-100 px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-[#D6145A]" />
@@ -337,20 +475,18 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
               <span>Ingia Mfumo (Login)</span>
             </button>
             
+            {/* Direct public registration is removed. Requires Admin Authentication */}
             <button
-              onClick={() => {
-                setActiveTab("register");
-                setRegErrorMsg("");
-                setRegSuccessMsg("");
-              }}
+              onClick={handleOpenRegisterTab}
               className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === "register"
                   ? "bg-[#D6145A] text-white shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
               }`}
+              title="Inalindwa: Inahitaji Ruhusa ya Admin Pekee"
             >
               <PlusCircle className="w-3.5 h-3.5" />
-              <span>Usajili wa Biometric (Register)</span>
+              <span>Usajili wa Ndani (Admin Only)</span>
             </button>
           </div>
         </div>
@@ -363,7 +499,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
             <div className="md:col-span-7 p-5 sm:p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-100">
               <div>
                 
-                {/* 🌟 RETURNED ORIGINAL CLINIC LOGO CONTAINER CENTRED PERFECTLY 🌟 */}
+                {/* Clinic Logo Header */}
                 <div className="flex justify-center mb-6">
                   <div className="flex flex-col items-center">
                     <img 
@@ -371,7 +507,6 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                       alt="Al-Furqan Logo" 
                       className="w-28 h-auto object-contain mb-2" 
                       onError={(e) => {
-                        // Fallback UI to preserve aesthetics if logo asset is missing in path
                         (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=120&auto=format&fit=crop&q=60";
                         (e.target as HTMLImageElement).className = "w-12 h-12 rounded-xl object-cover mb-2 border border-[#D6145A]/10";
                       }} 
@@ -551,7 +686,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
 
               <div className="mt-6 pt-4 border-t border-slate-100 text-left flex justify-between items-center">
                 <span className="text-[9px] text-slate-400 font-bold font-mono">
-                  IP: 192.168.1.102 • Node Verified
+                  IP: 192.168.1.102 â€¢ Node Verified
                 </span>
                 <span className="text-[9px] text-slate-400 font-bold font-mono">
                   SSL Active
@@ -571,70 +706,84 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                 </div>
                 <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-widest mb-1">KUINGIA KWA ALAMA YA KIDOLE</h4>
                 <p className="text-[11px] text-slate-500 font-medium max-w-[220px] mx-auto leading-relaxed">
-                  Gusa na ushikilie kidole chako. Mfumo utasoma na kuingiza pekee aliyesajiliwa.
+                  Gusa na ushikilie kidole chako. Ni kidole mahususi kilichosajiliwa pekee kitakachoruhusu kuingia.
                 </p>
               </div>
 
-              {/* FINGERPRINT SELECTION SYSTEM - answers "kila mtu isimruhusu" & "kidole kisome kama kipo" */}
+              {/* Strict Fingerprint Selection Hub */}
               <div className="w-full mt-4 space-y-3 z-10 text-left">
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                    1. Weka Kidole kwenye Kifaa (Place Finger on Scanner)
+                    1. Weka Kidole Kwenye Kifaa (Place Finger on Scanner)
                   </label>
                   <select
-                    value={selectedFingerSource}
+                    value={selectedFingerAttempt}
                     onChange={(e) => {
-                      setSelectedFingerSource(e.target.value);
+                      setSelectedFingerAttempt(e.target.value);
                       setBiometricError("");
                       setScanSuccess(false);
                       setBiometricStatus("");
                     }}
                     className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-[#D6145A] transition-colors shadow-sm"
                   >
-                    <option value="">-- Chagua Kidole cha Kujaribu --</option>
+                    <option value="">-- Chagua Alama ya Kidole Inayowekwa --</option>
                     
-                    <optgroup label="WAFANYAKAZI WALIOSAJILIWA">
-                      {registeredStaff.map(staff => (
-                        <option key={staff.id} value={staff.id}>
-                          ☝️ Kidole cha: {staff.name} ({staff.role})
+                    {registeredStaff.map(staff => (
+                      <optgroup key={staff.id} label={`ðŸ‘¤ ${staff.name.toUpperCase()} (${staff.role})`}>
+                        <option value={`${staff.id}:MATCH`}>
+                          âœ… [KIDOLE SAHIHI] {staff.fingerName || "Kidole cha Gumba cha Kuume"}
                         </option>
-                      ))}
-                    </optgroup>
+                        <option value={`${staff.id}:WRONG`}>
+                          âŒ [KIDOLE KISICHO SAHIHI] Kidole Tofauti cha {staff.name} (Sicho Kilichosajiliwa)
+                        </option>
+                      </optgroup>
+                    ))}
 
-                    <optgroup label="MGENI / MTU ASASAJILIWA (REJECT TEST)">
+                    <optgroup label="ðŸš¨ MTU KIGENI / ASIYESAJILIWA">
                       <option value="unauthorized_finger">
-                        🚨 Kidole kisichosajiliwa (Any unregistered person)
+                        ðŸš¨ Kidole cha Mtu Asiyesajiliwa (Unregistered Finger)
                       </option>
                     </optgroup>
                   </select>
                 </div>
 
                 {/* Badge for dynamic verification feedback */}
-                {selectedFingerSource && selectedFingerSource !== "unauthorized_finger" && (
-                  <div className="bg-emerald-50 border border-emerald-100 p-2.5 rounded-xl flex items-center justify-between">
+                {selectedFingerAttempt && selectedFingerAttempt.includes(":MATCH") && (
+                  <div className="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl flex items-center justify-between">
                     <div>
-                      <p className="text-[10px] font-extrabold text-emerald-800">Alama ya Kidole Ipo Kwenye Mfumo</p>
-                      <p className="text-[9px] font-semibold text-emerald-600">ID: {registeredStaff.find(s => s.id === selectedFingerSource)?.bioId}</p>
+                      <p className="text-[10px] font-extrabold text-emerald-800">Alama Sahihi ya Kidole Ipo Tayari</p>
+                      <p className="text-[9px] font-semibold text-emerald-600">
+                        {registeredStaff.find(s => selectedFingerAttempt.startsWith(s.id))?.fingerName}
+                      </p>
                     </div>
                     <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
                   </div>
                 )}
 
-                {selectedFingerSource === "unauthorized_finger" && (
-                  <div className="bg-rose-50 border border-rose-100 p-2.5 rounded-xl flex items-center justify-between">
+                {selectedFingerAttempt && selectedFingerAttempt.includes(":WRONG") && (
+                  <div className="bg-amber-50 border border-amber-200 p-2.5 rounded-xl flex items-center justify-between">
                     <div>
-                      <p className="text-[10px] font-extrabold text-rose-800">Kidole Kigeni / Haipo Kwenye Mfumo</p>
-                      <p className="text-[9px] font-semibold text-rose-600">Hakuna Database Link</p>
+                      <p className="text-[10px] font-extrabold text-amber-800">Tahadhari: Kidole Hiki Sicho Kilichosajiliwa!</p>
+                      <p className="text-[9px] font-semibold text-amber-700">Mfumo Utakataa (Strict Reject)</p>
+                    </div>
+                    <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
+                  </div>
+                )}
+
+                {selectedFingerAttempt === "unauthorized_finger" && (
+                  <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-xl flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-extrabold text-rose-800">Kidole Kigeni / Asiyesajiliwa</p>
+                      <p className="text-[9px] font-semibold text-rose-600">Hakuna Rekodi Kwenye Database</p>
                     </div>
                     <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 animate-bounce" />
                   </div>
                 )}
               </div>
 
-              {/* Interactive fingerprint scanner box styled matching the request in D6145A */}
+              {/* Interactive fingerprint scanner box */}
               <div className="my-5 relative flex flex-col items-center">
                 
-                {/* Fingerprint Squircle Button in custom requested color #D6145A */}
                 <button
                   type="button"
                   onClick={handleBiometricLogin}
@@ -648,7 +797,6 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                   }`}
                   title="Gusa ili kusoma Alama ya Kidole"
                 >
-                  {/* Scan sweep line */}
                   {biometricScanning && (
                     <>
                       <span className="absolute inset-0 rounded-3xl border-2 border-white/40 animate-ping" />
@@ -657,7 +805,6 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                     </>
                   )}
 
-                  {/* White Fingerprint Icon */}
                   <Fingerprint className={`w-16 h-16 text-white transition-transform duration-300 ${
                     biometricScanning ? "scale-90 animate-pulse" : "group-hover:scale-110"
                   }`} />
@@ -667,7 +814,6 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                   with fingerprint
                 </span>
 
-                {/* Scanner status light */}
                 <div className="flex items-center gap-2 mt-3 bg-white px-3 py-1.5 rounded-full border border-slate-100 shadow-sm">
                   <span className={`w-2.5 h-2.5 rounded-full ${
                     biometricScanning 
@@ -683,11 +829,11 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
               </div>
 
               {/* Status Display Area */}
-              <div className="w-full px-4 min-h-[50px] flex items-center justify-center">
+              <div className="w-full px-4 min-h-[60px] flex items-center justify-center">
                 {biometricError ? (
-                  <div className="bg-rose-50 border border-rose-100 p-2.5 rounded-xl">
+                  <div className="bg-rose-50 border border-rose-200 p-2.5 rounded-xl">
                     <p className="text-[10px] font-bold text-[#D6145A] leading-tight text-center">
-                      ⚠️ {biometricError}
+                      {biometricError}
                     </p>
                   </div>
                 ) : biometricStatus ? (
@@ -697,8 +843,8 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                     </p>
                   </div>
                 ) : (
-                  <p className="text-[10px] text-slate-400 font-bold max-w-[190px] leading-relaxed">
-                    Chagua mfanyakazi au kidole kigeni kwanza, kisha gusa kitufe cha fingerprint cha rangi ya <span className="text-[#D6145A]">#D6145A</span> kuhakiki.
+                  <p className="text-[10px] text-slate-400 font-bold max-w-[210px] leading-relaxed">
+                    Chagua mfanyakazi na alama ya kidole kwenye kisanduku, kisha gusa kitufe cha <span className="text-[#D6145A]">#D6145A</span> kuanza Uhakiki wa Kidole.
                   </p>
                 )}
               </div>
@@ -707,16 +853,16 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
 
           </div>
         ) : (
-          /* SECTION MAALUMU YA USAJILI WA BIOMETRICS (Register Biometrics panel) */
+          /* SECTION MAALUMU YA USAJILI WA BIOMETRICS (Usajili wa Ndani - Admin Only) */
           <div className="p-8 flex-1 bg-slate-50 flex flex-col justify-between">
             <div className="max-w-2xl mx-auto w-full">
               
               <div className="text-center mb-6">
                 <span className="px-3 py-1 bg-[#D6145A]/10 text-[#D6145A] text-[10px] font-black rounded-full uppercase tracking-wider">
-                  🔐 Sehemu Maalumu ya Usajili (Biometric Registration Desk)
+                  ðŸ” Usajili wa Ndani ya Mfumo (Admin Authorized Panel)
                 </span>
-                <h3 className="text-2xl font-black text-slate-800 tracking-tight mt-2">Usajili wa Mfanyakazi Mpya</h3>
-                <p className="text-xs text-slate-500 font-medium">Sajili taarifa za mfanyakazi na uhifadhi alama ya kidole chake ili aweze kutumia biometric kuingia kwenye mfumo.</p>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight mt-2">Usajili wa Mfanyakazi Mpya & Alama ya Kidole</h3>
+                <p className="text-xs text-slate-500 font-medium">Sajili taarifa za mfanyakazi na uchague kidole chake mahususi ili aweze kutumia Biometric kuingia.</p>
               </div>
 
               {regErrorMsg && (
@@ -772,7 +918,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                     <input
                       type="password"
                       required
-                      placeholder="••••••••"
+                      placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
                       className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-[#D6145A]/20"
@@ -796,11 +942,29 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                     </select>
                   </div>
 
+                  {/* Fingerprint Selection during Registration */}
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                      Kidole Mahususi cha Kusajili (Register Specific Finger)
+                    </label>
+                    <select
+                      value={regFingerType}
+                      onChange={(e) => setRegFingerType(e.target.value)}
+                      className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-[#D6145A]/20"
+                    >
+                      <option value="RIGHT_THUMB">ðŸ‘ Kidole cha Gumba cha Kuume (Right Thumb)</option>
+                      <option value="RIGHT_INDEX">â˜ï¸ Kidole cha Shahada cha Kuume (Right Index)</option>
+                      <option value="RIGHT_MIDDLE">ðŸ–• Kidole cha Kati cha Kuume (Right Middle)</option>
+                      <option value="LEFT_THUMB">ðŸ‘ Kidole cha Gumba cha Kushoto (Left Thumb)</option>
+                      <option value="LEFT_INDEX">â˜ï¸ Kidole cha Shahada cha Kushoto (Left Index)</option>
+                    </select>
+                  </div>
+
                   <button
                     type="submit"
                     className="w-full p-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer"
                   >
-                    Hifadhi na Kamilisha Usajili
+                    Hifadhi na Kamilisha Usajili wa Ndani
                   </button>
                 </form>
 
@@ -843,10 +1007,10 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                   <div>
                     <h5 className="text-xs font-extrabold text-slate-700">
                       {regScanning 
-                        ? "Soma kidole... Tafadhali weka kidole chako" 
+                        ? "Inasoma kidole... Weka kidole chako kwenye scanner" 
                         : regBiometricRegistered 
-                        ? "✅ ALAMA YA KIDOLE IMEREKODIWA!" 
-                        : "GUSA HAPA KUSOMA KIDOLE CHAKO"}
+                        ? `âœ… ${FINGER_OPTIONS[regFingerType] || "KIDOLE"} KIMEREKODIWA!` 
+                        : "GUSA HAPA KUSOMA ALAMA YA KIDOLE"}
                     </h5>
                     
                     {regBiometricKey && (
@@ -857,7 +1021,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                   </div>
 
                   <p className="text-[10px] text-slate-400 max-w-[180px] leading-relaxed">
-                    Unapogusa kitufe hapo juu, kitambua biometric kitafanya kazi na kusajili sifa za kipekee za kidole chako.
+                    Unapogusa kitufe hapo juu, scanner inahifadhi vipimo na sifa za kipekee za kidole ulichochagua.
                   </p>
                 </div>
 
@@ -875,7 +1039,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                 }}
                 className="text-xs text-[#D6145A] hover:underline font-bold"
               >
-                ← Ghairi na urudi kwenye Ukurasa wa Kuingia (Login)
+                â† Ghairi na urudi kwenye Ukurasa wa Kuingia (Login)
               </button>
             </div>
           </div>
