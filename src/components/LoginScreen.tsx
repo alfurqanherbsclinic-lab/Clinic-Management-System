@@ -13,8 +13,12 @@ import {
   PlusCircle,
   LogIn,
   Users,
-  X
+  X,
+  Trash2,
+  UserX
 } from "lucide-react";
+import { db } from "../firebase";
+import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 
 interface LoginScreenProps {
   onLoginSuccess: (username: string, role: string) => void;
@@ -86,7 +90,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
   const [resetEmail, setResetEmail] = useState("");
   const [resetSuccess, setResetSuccess] = useState("");
 
-  // Biometric Database (localStorage)
+  // Biometric Database (Synced with Firebase)
   const [registeredStaff, setRegisteredStaff] = useState<any[]>([]);
   
   // Registration States (Usajili wa Ndani - Admin Only)
@@ -108,14 +112,45 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
   const [scanSuccess, setScanSuccess] = useState(false);
   const [biometricError, setBiometricError] = useState("");
 
-  // Pakia Database ya Biometrics
+  // Pakia Database ya Biometrics (Firebase Sync)
   useEffect(() => {
-    const saved = localStorage.getItem("al_furqan_biometric_staff");
-    if (saved) {
-      setRegisteredStaff(JSON.parse(saved));
-    } else {
-      localStorage.setItem("al_furqan_biometric_staff", JSON.stringify(DEFAULT_STAFF));
-      setRegisteredStaff(DEFAULT_STAFF);
+    let unsubscribe = () => {};
+
+    try {
+      unsubscribe = onSnapshot(collection(db, "staff_members"), (snapshot) => {
+        if (!snapshot.empty) {
+          const staffList = snapshot.docs.map(docSnap => docSnap.data());
+          setRegisteredStaff(staffList);
+          localStorage.setItem("al_furqan_biometric_staff", JSON.stringify(staffList));
+        } else {
+          // Kama database ya Firebase haina wafanyakazi, weka wa awali (Seed Default Staff)
+          DEFAULT_STAFF.forEach(async (staff) => {
+            try {
+              await setDoc(doc(db, "staff_members", staff.id), staff);
+            } catch (e) {
+              console.error("Error seeding default staff:", e);
+            }
+          });
+          setRegisteredStaff(DEFAULT_STAFF);
+          localStorage.setItem("al_furqan_biometric_staff", JSON.stringify(DEFAULT_STAFF));
+        }
+      }, (err) => {
+        console.error("Firestore staff sync fallback to localStorage:", err);
+        const saved = localStorage.getItem("al_furqan_biometric_staff");
+        if (saved) {
+          setRegisteredStaff(JSON.parse(saved));
+        } else {
+          setRegisteredStaff(DEFAULT_STAFF);
+        }
+      });
+    } catch (err) {
+      console.error("Firebase connection error:", err);
+      const saved = localStorage.getItem("al_furqan_biometric_staff");
+      if (saved) {
+        setRegisteredStaff(JSON.parse(saved));
+      } else {
+        setRegisteredStaff(DEFAULT_STAFF);
+      }
     }
 
     // Angalia kama kuna mtumiaji aliyekumbukwa
@@ -126,6 +161,8 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
       setRole(savedRole);
       setRememberMe(true);
     }
+
+    return () => unsubscribe();
   }, []);
 
   // Kufungua sehemu ya usajili baada ya kuthibitisha Msimamizi Mkuu (Admin)
@@ -148,8 +185,8 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
     }
   };
 
-  // Hifadhi usajili mpya wa mfanyakazi na Alama ya Kidole Mahususi
-  const handleRegisterBiometrics = (e: React.FormEvent) => {
+  // Hifadhi usajili mpya wa mfanyakazi na Alama ya Kidole Mahususi Kwenye Firebase Database
+  const handleRegisterBiometrics = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegErrorMsg("");
     setRegSuccessMsg("");
@@ -193,12 +230,19 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
       fingerName: fingerNameText
     };
 
+    // Hifadhi kwenye Firebase Firestore Document
+    try {
+      await setDoc(doc(db, "staff_members", newStaff.id), newStaff);
+    } catch (err) {
+      console.error("Firebase save staff error:", err);
+    }
+
     const updatedList = [...registeredStaff, newStaff];
     localStorage.setItem("al_furqan_biometric_staff", JSON.stringify(updatedList));
     setRegisteredStaff(updatedList);
 
-    // Safisha fomu na urudi kwenye login
-    setRegSuccessMsg(`Hongera! ${regName} amesajiliwa kikamilifu. Kidole kilichoruhusiwa: ${fingerNameText} (ID: ${regBiometricKey})`);
+    // Safisha fomu na kutoa taarifa
+    setRegSuccessMsg(`Hongera! ${regName} amesajiliwa kikamilifu kwenye Database na kuingizwa kwenye mfumo. Kidole kilichoruhusiwa: ${fingerNameText} (ID: ${regBiometricKey})`);
     
     setTimeout(() => {
       setUsername(regUsername);
@@ -213,6 +257,25 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
       setRegBiometricKey("");
       setRegSuccessMsg("");
     }, 3500);
+  };
+
+  // Kufuta Mfanyakazi kutoka kwenye Mfumo na Firebase Database (Admin Delete)
+  const handleDeleteStaff = async (staffId: string, staffName: string) => {
+    if (!window.confirm(`Je, una uhakika unataka kumfuta Mfanyakazi '${staffName}' kwenye mfumo? Mfanyakazi huyu hatakuwa tena na uwezo wa kuingia.`)) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "staff_members", staffId));
+    } catch (err) {
+      console.error("Firebase delete staff error:", err);
+    }
+
+    const updatedList = registeredStaff.filter(s => s.id !== staffId);
+    setRegisteredStaff(updatedList);
+    localStorage.setItem("al_furqan_biometric_staff", JSON.stringify(updatedList));
+    setRegSuccessMsg(`Mfanyakazi '${staffName}' amefutwa kabisa kwenye mfumo na hana tena uwezo wa kuingia.`);
+    setTimeout(() => setRegSuccessMsg(""), 4000);
   };
 
   // Simulates fingerprint acquisition process for new registration
@@ -286,7 +349,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
     }, 1200);
   };
 
-  // Udhibiti Madhubuti wa Alama ya Kidole (Strict Fingerprint Verification)
+  // Udhibiti Madhubuti wa Alama ya Kidole (Strict Fingerprint Validation)
   const handleBiometricLogin = () => {
     setBiometricError("");
     setBiometricStatus("");
@@ -307,7 +370,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
 
     setTimeout(() => {
       
-      // 1. Mtu kigeni / Kidole kisichosajiliwa
+      // 1. Mtu kigeni / Kidole kisichosajiliwa (Strict Reject)
       if (selectedFingerAttempt === "unauthorized_finger") {
         setBiometricStatus("Uhakiki umeanza... Inatafuta kwenye Database...");
         
@@ -326,7 +389,9 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
 
         if (!staff) {
           setBiometricScanning(false);
-          setBiometricError("Mtumiaji hajatambuliwa!");
+          setScanSuccess(false);
+          onIncrementAttempts();
+          setBiometricError("âŒ Mtumiaji huyu hajatambuliwa au amefutwa kabisa kwenye mfumo! Access Denied.");
           return;
         }
 
@@ -343,7 +408,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
               onIncrementAttempts();
               setBiometricError(`âŒ ALAMA YA KIDOLE HAIINGILIANI! Kidole hiki sicho kilichosajiliwa kwa mtumiaji (${staff.name}). Kidole chake pekee kinachokubalika ni: [${staff.fingerName || "Kidole Kilichosajiliwa"}]. Access Denied!`);
               setBiometricStatus("");
-            } else {
+            } else if (fingerMatchStatus === "MATCH") {
               // Kidole Sahihi Kilichosajiliwa Pekee Ndio Kinaruhusiwa
               setBiometricScanning(false);
               setScanSuccess(true);
@@ -352,6 +417,12 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
               setTimeout(() => {
                 onLoginSuccess(staff.username, staff.roleDisplay);
               }, 800);
+            } else {
+              setBiometricScanning(false);
+              setScanSuccess(false);
+              onIncrementAttempts();
+              setBiometricError("âŒ Kidole kisichojulikana au kisicho sahihi! Access Denied.");
+              setBiometricStatus("");
             }
           }, 1200);
         }, 1200);
@@ -387,7 +458,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
           <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl border border-slate-200 relative animate-in fade-in zoom-in-95">
             <button 
               onClick={() => setShowAdminAuthModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -398,7 +469,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
               </div>
               <div>
                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Usajili wa Ndani (Admin Only)</h3>
-                <p className="text-[11px] text-slate-500 font-medium">Thibitisha nywila ya Admin ili kusajili mtumiaji mpya.</p>
+                <p className="text-[11px] text-slate-500 font-medium">Thibitisha nywila ya Admin ili kusajili au kudhibiti wafanyakazi.</p>
               </div>
             </div>
 
@@ -604,7 +675,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                         >
                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
@@ -668,14 +739,14 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                           setResetSuccess("");
                           setError("");
                         }}
-                        className="w-1/2 p-2.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50"
+                        className="w-1/2 p-2.5 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 cursor-pointer"
                       >
                         Rudi Nyuma
                       </button>
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-1/2 p-2.5 bg-[#D6145A] text-white text-xs font-bold rounded-xl hover:bg-[#b00f48]"
+                        className="w-1/2 p-2.5 bg-[#D6145A] text-white text-xs font-bold rounded-xl hover:bg-[#b00f48] cursor-pointer"
                       >
                         {loading ? "Inatuma..." : "Tuma Ombi"}
                       </button>
@@ -855,9 +926,9 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
         ) : (
           /* SECTION MAALUMU YA USAJILI WA BIOMETRICS (Usajili wa Ndani - Admin Only) */
           <div className="p-8 flex-1 bg-slate-50 flex flex-col justify-between">
-            <div className="max-w-2xl mx-auto w-full">
+            <div className="max-w-3xl mx-auto w-full space-y-6">
               
-              <div className="text-center mb-6">
+              <div className="text-center">
                 <span className="px-3 py-1 bg-[#D6145A]/10 text-[#D6145A] text-[10px] font-black rounded-full uppercase tracking-wider">
                   ðŸ” Usajili wa Ndani ya Mfumo (Admin Authorized Panel)
                 </span>
@@ -866,14 +937,14 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
               </div>
 
               {regErrorMsg && (
-                <div className="bg-rose-50 border-l-4 border-rose-500 p-3 mb-4 rounded-xl flex items-start gap-2.5 text-xs text-rose-800 font-semibold">
+                <div className="bg-rose-50 border-l-4 border-rose-500 p-3 rounded-xl flex items-start gap-2.5 text-xs text-rose-800 font-semibold">
                   <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
                   <div>{regErrorMsg}</div>
                 </div>
               )}
 
               {regSuccessMsg && (
-                <div className="bg-emerald-50 border-l-4 border-emerald-500 p-3 mb-4 rounded-xl flex items-start gap-2.5 text-xs text-emerald-800 font-semibold animate-pulse">
+                <div className="bg-emerald-50 border-l-4 border-emerald-500 p-3 rounded-xl flex items-start gap-2.5 text-xs text-emerald-800 font-semibold animate-pulse">
                   <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
                   <div>{regSuccessMsg}</div>
                 </div>
@@ -939,6 +1010,8 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                       <option value="Nurse">Muuguzi (Nurse)</option>
                       <option value="Pharmacist">Mfamasia (Pharmacist)</option>
                       <option value="Lab Technician">Mtaalamu wa Maabara</option>
+                      <option value="Cashier">Mhasibu / Cashier</option>
+                      <option value="Receptionist">Mapokezi / Receptionist</option>
                     </select>
                   </div>
 
@@ -1027,9 +1100,59 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
 
               </div>
 
+              {/* Orodha ya Wafanyakazi Waliopo na Usimamizi wa Kufuta (Admin Only Staff Management) */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-[#D6145A]" />
+                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">
+                      Orodha ya Wafanyakazi Waliopo Kwenye Database ({registeredStaff.length})
+                    </h4>
+                  </div>
+                  <span className="text-[10px] font-black text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full uppercase">
+                    Admin Only Management
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[320px] overflow-y-auto pr-1">
+                  {registeredStaff.map((staff) => (
+                    <div 
+                      key={staff.id} 
+                      className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 hover:border-slate-300 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-black text-slate-800 truncate">{staff.name}</p>
+                          <span className="text-[9px] font-black px-2 py-0.5 bg-[#D6145A]/10 text-[#D6145A] rounded-full uppercase">
+                            {staff.role}
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-semibold text-slate-500 mt-0.5">
+                          Username: <span className="font-mono text-slate-700">{staff.username}</span>
+                        </p>
+                        <p className="text-[10px] text-emerald-700 font-bold flex items-center gap-1 mt-0.5">
+                          <Fingerprint className="w-3 h-3 text-emerald-600 shrink-0" />
+                          <span className="truncate">{staff.fingerName || "Kidole cha Gumba"}</span>
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteStaff(staff.id, staff.name)}
+                        className="p-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 hover:text-rose-800 rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0 text-[10px] font-bold"
+                        title={`Futa ${staff.name} kwenye mfumo`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Futa</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
             </div>
 
-            <div className="text-center pt-4 border-t border-slate-100">
+            <div className="text-center pt-4 border-t border-slate-100 mt-6">
               <button
                 type="button"
                 onClick={() => {
@@ -1037,7 +1160,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
                   setRegErrorMsg("");
                   setRegSuccessMsg("");
                 }}
-                className="text-xs text-[#D6145A] hover:underline font-bold"
+                className="text-xs text-[#D6145A] hover:underline font-bold cursor-pointer"
               >
                 â† Ghairi na urudi kwenye Ukurasa wa Kuingia (Login)
               </button>
