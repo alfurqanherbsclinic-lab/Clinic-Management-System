@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Settings, 
   UserCheck, 
@@ -9,28 +9,27 @@ import {
   CheckCircle2, 
   Lock,
   Download,
-  RotateCcw
+  RotateCcw,
+  Trash2,
+  ShieldAlert,
+  Fingerprint
 } from "lucide-react";
 import { StaffUser, AuditLog } from "../types";
+import { db } from "../firebase";
+import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 
 interface SettingsStaffModuleProps {
   activeSubTab?: "settings_config" | "settings_staff" | "settings_logs";
 }
 
-const INITIAL_STAFF: StaffUser[] = [
-  { id: "STF-01", name: "Dr. Khalifa Rehani", role: "Doctor", phone: "0711223344", email: "khalifa@alfurqan.co.tz", status: "Active" },
-  { id: "STF-02", name: "Amina Juma", role: "Nurse", phone: "0755667788", email: "amina@alfurqan.co.tz", status: "Active" },
-  { id: "STF-03", name: "Omari Rashidi", role: "Pharmacist", phone: "0788990011", email: "omari@alfurqan.co.tz", status: "Active" }
-];
-
 const INITIAL_LOGS: AuditLog[] = [
-  { id: "LOG-001", timestamp: "2026-07-23 09:30", user: "Dr. Khalifa Rehani", action: "PATIENT_CONSULTATION", details: "Saved clinical record for patient ALI HASSAN" },
-  { id: "LOG-002", timestamp: "2026-07-23 09:45", user: "Omari Rashidi", action: "PHARMACY_SALE", details: "Processed receipt REC-2026-1049" }
+  { id: "LOG-001", timestamp: "2026-07-23 09:30", user: "Abdu Khalifa", action: "PATIENT_CONSULTATION", details: "Saved clinical record for patient ALI HASSAN" },
+  { id: "LOG-002", timestamp: "2026-07-23 09:45", user: "Fatma Ali", action: "PHARMACY_SALE", details: "Processed receipt REC-2026-1049" }
 ];
 
 export function SettingsStaffModule({ activeSubTab = "settings_config" }: SettingsStaffModuleProps) {
   const [subTab, setSubTab] = useState<"settings_config" | "settings_staff" | "settings_logs">(activeSubTab);
-  const [staff, setStaff] = useState<StaffUser[]>(INITIAL_STAFF);
+  const [dbStaff, setDbStaff] = useState<any[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>(INITIAL_LOGS);
 
   // Oasis SMS settings
@@ -39,29 +38,125 @@ export function SettingsStaffModule({ activeSubTab = "settings_config" }: Settin
 
   // New staff form
   const [staffName, setStaffName] = useState("");
-  const [staffRole, setStaffRole] = useState<StaffUser["role"]>("Doctor");
+  const [staffUsername, setStaffUsername] = useState("");
+  const [staffRole, setStaffRole] = useState("Doctor");
   const [staffPhone, setStaffPhone] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const handleAddStaff = () => {
-    if (!staffName.trim()) return;
-    const newMember: StaffUser = {
-      id: "STF-0" + (staff.length + 1),
+  // Sync with Firebase Firestore Real-Time
+  useEffect(() => {
+    let unsubscribe = () => {};
+    try {
+      unsubscribe = onSnapshot(collection(db, "staff_members"), (snapshot) => {
+        if (!snapshot.empty) {
+          const list = snapshot.docs.map(docSnap => docSnap.data());
+          setDbStaff(list);
+          localStorage.setItem("al_furqan_biometric_staff", JSON.stringify(list));
+          localStorage.setItem("al_furqan_staff_initialized", "true");
+        } else {
+          const isInitialized = localStorage.getItem("al_furqan_staff_initialized");
+          if (!isInitialized) {
+            const saved = localStorage.getItem("al_furqan_biometric_staff");
+            if (saved !== null) setDbStaff(JSON.parse(saved));
+          } else {
+            setDbStaff([]);
+            localStorage.setItem("al_furqan_biometric_staff", JSON.stringify([]));
+          }
+        }
+      }, (err) => {
+        console.error("Firestore sync error:", err);
+        const saved = localStorage.getItem("al_furqan_biometric_staff");
+        const isInitialized = localStorage.getItem("al_furqan_staff_initialized");
+        if (saved !== null && isInitialized) {
+          setDbStaff(JSON.parse(saved));
+        } else {
+          setDbStaff([]);
+        }
+      });
+    } catch (e) {
+      console.error("Firebase init error:", e);
+      const saved = localStorage.getItem("al_furqan_biometric_staff");
+      if (saved !== null) setDbStaff(JSON.parse(saved));
+    }
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleAddStaff = async () => {
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    if (!staffName.trim() || !staffUsername.trim()) {
+      setErrorMsg("Tafadhali jaza Jina Kamili na Username.");
+      return;
+    }
+
+    const cleanUsername = staffUsername.toLowerCase().replace(/\s+/g, "");
+
+    let roleDisplay = "Msimamizi Mkuu";
+    if (staffRole === "Doctor") roleDisplay = "Daktari (Doctor)";
+    if (staffRole === "Nurse") roleDisplay = "Muuguzi (Nurse)";
+    if (staffRole === "Pharmacist") roleDisplay = "Mfamasia (Pharmacist)";
+    if (staffRole === "Lab Tech" || staffRole === "Lab Technician") roleDisplay = "Mtaalamu wa Maabara";
+    if (staffRole === "Cashier") roleDisplay = "Mhasibu / Cashier";
+    if (staffRole === "Receptionist") roleDisplay = "Mapokezi / Receptionist";
+
+    const newStaff = {
+      id: "staff_" + Date.now(),
       name: staffName,
+      username: cleanUsername,
       role: staffRole,
+      roleDisplay: roleDisplay,
+      bioId: "FP-" + Math.floor(1000 + Math.random() * 9000) + "-REG",
+      fingerCode: "RIGHT_THUMB",
+      fingerName: "Kidole cha Gumba cha Kuume (Right Thumb)",
       phone: staffPhone || "07XXXXXXXX",
-      email: staffName.toLowerCase().replace(" ", ".") + "@alfurqan.co.tz",
       status: "Active"
     };
-    setStaff(prev => [...prev, newMember]);
+
+    localStorage.setItem("al_furqan_staff_initialized", "true");
+
+    try {
+      await setDoc(doc(db, "staff_members", newStaff.id), newStaff);
+    } catch (e) {
+      console.error("Error adding staff to Firebase:", e);
+    }
+
+    const updated = [...dbStaff, newStaff];
+    setDbStaff(updated);
+    localStorage.setItem("al_furqan_biometric_staff", JSON.stringify(updated));
+
     setStaffName("");
+    setStaffUsername("");
     setStaffPhone("");
-    setSuccessMsg(`Mtumishi mpya '${newMember.name}' ameongezwa kwenye mfumo!`);
+    setSuccessMsg(`Mfanyakazi mpya '${newStaff.name}' amesajiliwa kikamilifu kwenye Database na anaweza kuingia kwenye mfumo!`);
+    setTimeout(() => setSuccessMsg(""), 4000);
+  };
+
+  const handleDeleteStaff = async (id: string, name: string) => {
+    if (!window.confirm(`Je, una uhakika unataka kumfuta Mfanyakazi '${name}' kwenye mfumo? Mfanyakazi huyu hatakuwa tena na uwezo wa kuingia.`)) {
+      return;
+    }
+
+    localStorage.setItem("al_furqan_staff_initialized", "true");
+
+    try {
+      await deleteDoc(doc(db, "staff_members", id));
+    } catch (e) {
+      console.error("Error deleting staff from Firebase:", e);
+    }
+
+    const updated = dbStaff.filter(s => s.id !== id);
+    setDbStaff(updated);
+    localStorage.setItem("al_furqan_biometric_staff", JSON.stringify(updated));
+
+    setSuccessMsg(`Mfanyakazi '${name}' amefutwa kikamilifu kutoka kwenye Database na hana tena uwezo wa kuingia.`);
     setTimeout(() => setSuccessMsg(""), 4000);
   };
 
   const handleBackup = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ staff, logs }));
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ staff: dbStaff, logs }));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
     downloadAnchor.setAttribute("download", `AL_FURQAN_HIS_BACKUP_${new Date().toISOString().split("T")[0]}.json`);
@@ -178,59 +273,127 @@ export function SettingsStaffModule({ activeSubTab = "settings_config" }: Settin
         </div>
       )}
 
-      {/* SubTab 2: Staff */}
+      {/* SubTab 2: Staff Management & Deletion (Admin Only) */}
       {subTab === "settings_staff" && (
         <div className="space-y-4">
-          <div className="bg-slate-50 p-4 rounded-xl border space-y-3">
-            <h3 className="text-xs font-black text-primary uppercase">Sajili Wafanyakazi WAPYA:</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <input
-                type="text"
-                placeholder="Jina Kamili la Mtumishi"
-                value={staffName}
-                onChange={(e) => setStaffName(e.target.value)}
-                className="p-2 border rounded text-xs font-bold"
-              />
-              <select
-                value={staffRole}
-                onChange={(e) => setStaffRole(e.target.value as any)}
-                className="p-2 border rounded text-xs font-bold bg-white"
-              >
-                <option value="Doctor">Doctor (Daktari)</option>
-                <option value="Nurse">Nurse (Muuguzi)</option>
-                <option value="Pharmacist">Pharmacist (Mfamasia)</option>
-                <option value="Lab Tech">Lab Tech (Maabara)</option>
-                <option value="Receptionist">Receptionist (Mapokezi)</option>
-                <option value="Admin">Admin (Msimamizi)</option>
-              </select>
-              <input
-                type="text"
-                placeholder="Namba ya Simu"
-                value={staffPhone}
-                onChange={(e) => setStaffPhone(e.target.value)}
-                className="p-2 border rounded text-xs font-bold"
-              />
+          
+          {errorMsg && (
+            <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{errorMsg}</span>
             </div>
+          )}
+
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+            <h3 className="text-xs font-black text-primary uppercase flex items-center gap-2">
+              <Plus className="w-4 h-4 text-[#D6145A]" />
+              <span>Sajili Mfanyakazi Mpya kwenye Database (Firebase Sync):</span>
+            </h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">Jina Kamili</label>
+                <input
+                  type="text"
+                  placeholder="mf. Abdu Khalifa"
+                  value={staffName}
+                  onChange={(e) => setStaffName(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">Username (ya Kuingia)</label>
+                <input
+                  type="text"
+                  placeholder="mf. abdu.khalifa"
+                  value={staffUsername}
+                  onChange={(e) => setStaffUsername(e.target.value.toLowerCase().replace(/\s+/g, ""))}
+                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">Nafasi / Role</label>
+                <select
+                  value={staffRole}
+                  onChange={(e) => setStaffRole(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                >
+                  <option value="Administrator">Administrator (Msimamizi)</option>
+                  <option value="Doctor">Doctor (Daktari)</option>
+                  <option value="Nurse">Nurse (Muuguzi)</option>
+                  <option value="Pharmacist">Pharmacist (Mfamasia)</option>
+                  <option value="Lab Tech">Lab Tech (Maabara)</option>
+                  <option value="Cashier">Cashier (Mhasibu)</option>
+                  <option value="Receptionist">Receptionist (Mapokezi)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">Namba ya Simu</label>
+                <input
+                  type="text"
+                  placeholder="07XXXXXXXX"
+                  value={staffPhone}
+                  onChange={(e) => setStaffPhone(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                />
+              </div>
+            </div>
+
             <button
               onClick={handleAddStaff}
-              className="py-2 px-4 bg-slate-800 text-white font-bold text-xs rounded cursor-pointer"
+              className="py-2.5 px-5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl cursor-pointer shadow-xs transition-all flex items-center gap-1.5"
             >
-              + Ongeza Mtumishi
+              <Plus className="w-4 h-4" />
+              <span>Sajili Mfanyakazi Mpya</span>
             </button>
           </div>
 
-          <div className="space-y-2">
-            <h3 className="text-xs font-black text-primary uppercase">Wafanyakazi Waliopo ({staff.length}):</h3>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xs font-black text-primary uppercase tracking-wider">
+                Orodha ya Wafanyakazi Waliopo kwenye Database ({dbStaff.length}):
+              </h3>
+              <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                ● Live Firebase Firestore Sync
+              </span>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {staff.map(s => (
-                <div key={s.id} className="p-3 bg-white border rounded-xl flex justify-between items-center text-xs">
-                  <div>
-                    <p className="font-extrabold text-primary">{s.name}</p>
-                    <p className="text-gray-500 font-mono">📱 {s.phone} • {s.email}</p>
+              {dbStaff.map(s => (
+                <div key={s.id} className="p-4 bg-white border border-slate-200 rounded-2xl flex justify-between items-center text-xs shadow-xs hover:border-slate-300 transition-all">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-black text-slate-900 text-sm">{s.name}</p>
+                      <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-black rounded-md text-[10px] uppercase">
+                        {s.roleDisplay || s.role}
+                      </span>
+                    </div>
+
+                    <p className="text-slate-500 font-medium">
+                      Username: <code className="font-mono bg-slate-100 text-primary px-1.5 py-0.5 rounded font-bold">{s.username}</code>
+                    </p>
+
+                    <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono">
+                      <span>📱 {s.phone || "07XXXXXXXX"}</span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1 text-slate-600 font-bold">
+                        <Fingerprint className="w-3 h-3 text-[#D6145A]" />
+                        {s.fingerName || "Kidole cha Gumba"}
+                      </span>
+                    </div>
                   </div>
-                  <span className="px-2 py-0.5 bg-rose-100 text-rose-800 font-black rounded text-[10px] uppercase">
-                    {s.role}
-                  </span>
+
+                  <button
+                    onClick={() => handleDeleteStaff(s.id, s.name)}
+                    className="p-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 rounded-xl transition-all cursor-pointer flex items-center gap-1 border border-rose-200 text-xs font-bold"
+                    title="Futa Mfanyakazi Huyu kwenye Mfumo"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">Futa</span>
+                  </button>
                 </div>
               ))}
             </div>
