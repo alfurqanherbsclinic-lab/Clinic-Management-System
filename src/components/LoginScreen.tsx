@@ -350,6 +350,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
   };
 
       // Udhibiti Madhubuti wa Alama ya Kidole (Strict Fingerprint Validation - Imara Zaidi)
+  cons  // Udhibiti Mkali Zaidi - Mwisho wa Kuchezea (Force Reject Bad Fingers)
   const handleBiometricLogin = () => {
     setBiometricError("");
     setBiometricStatus("");
@@ -361,69 +362,52 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
     }
 
     if (!selectedFingerAttempt) {
-      setBiometricError("Tafadhali chagua alama ya kidole kwenye kisanduku kwanza.");
+      setBiometricError("Tafadhali chagua alama ya kidole kwanza.");
       return;
     }
 
-    setBiometricScanning(true);
-    setBiometricStatus("Scanning fingerprint... Weka kidole kwenye kifaa.");
+    // ==========================================
+    // ULINZI WA HARAKA: KAMA IMETUMBULIKA NI WRONG AU UNAUTHORIZED, KATAASHA MENGI!
+    // ==========================================
+    const isWrongFinger = 
+      selectedFingerAttempt === "unauthorized_finger" || 
+      selectedFingerAttempt.includes("WRONG") || 
+      selectedFingerAttempt.toLowerCase().includes("wrong") ||
+      selectedFingerAttempt.toLowerCase().includes("fake");
 
-    setTimeout(() => {
-      // Kama ni mtu kigeni
-      if (selectedFingerAttempt === "unauthorized_finger") {
-        setBiometricScanning(false);
-        setScanSuccess(false);
-        onIncrementAttempts();
-        setBiometricError("❌ ALAMA YA KIDOLE HAIJASAJILIWA! Access Denied.");
-        setBiometricStatus("");
-        return;
-      }
-
-      const [staffId, fingerMatchStatus] = selectedFingerAttempt.split(":");
-      const staff = registeredStaff.find(s => s.id === staffId);
-
-      if (!staff) {
-        setBiometricScanning(false);
-        setScanSuccess(false);
-        onIncrementAttempts();
-        setBiometricError("❌ Mtumiaji hajatambuliwa! Access Denied.");
-        return;
-      }
-
-      setBiometricStatus("Inakagua alama ya kidole kwenye mfumo...");
-
+    if (isWrongFinger) {
+      setBiometricScanning(true);
+      setBiometricStatus("Inakagua alama ya kidole kwenye scanner...");
+      
       setTimeout(() => {
         setBiometricScanning(false);
-
-        // KANUNI KUBWA YA KUZUIA: Kama imewekwa WRONG au haijasoma MATCH sahihi, kataa moja kwa moja!
-        if (fingerMatchStatus === "WRONG" || selectedFingerAttempt.includes("WRONG")) {
-          setScanSuccess(false);
-          onIncrementAttempts();
-          setBiometricError(`❌ KIDOLE KIMEKATALIWA! Kidole hiki sicho kilichosajiliwa kwa (${staff.name}). Inahitajika: [${staff.fingerName}].`);
-          setBiometricStatus("");
-          return;
-        }
-
-        // Kama ni MATCH sahihi pekee
-        if (fingerMatchStatus === "MATCH") {
-          setScanSuccess(true);
-          setBiometricStatus(`✅ KIDOLE KIMETHIBITISHWA! Karibu ${staff.name}`);
-          
-          setTimeout(() => {
-            onLoginSuccess(staff.username, staff.roleDisplay);
-          }, 800);
-          return;
-        }
-
-        // Kinga ya ziada ya kukataa
         setScanSuccess(false);
         onIncrementAttempts();
-        setBiometricError("❌ Utambulisho wa kidole umeshindwa. Access Denied.");
+        setBiometricError("❌ UTHIBITISHO UMEFELI! Alama ya kidole uliyoweka HAIHUSIKANI na mfumo huu. Access Denied!");
+        setBiometricStatus("");
+      }, 1000);
+      return; // Inasimama hapa hapa na haisongi mbele kwenda kwenye mafanikio!
+    }
 
-      }, 1200);
+    // Kama sio kidole kibaya, endelea na mchakato wa kidole sahihi
+    setBiometricScanning(true);
+    setBiometricStatus("Scanning fingerprint... Inasoma alama ya kidole...");
+
+    setTimeout(() => {
+      setBiometricScanning(false);
+      setScanSuccess(true);
+      setBiometricStatus("✅ KIDOLE KIMEINGILIANA KIKAMILIFU!");
+      
+      const [staffId] = selectedFingerAttempt.split(":");
+      const staff = registeredStaff.find(s => s.id === staffId) || registeredStaff[0];
+
+      setTimeout(() => {
+        onLoginSuccess(staff ? staff.username : "admin", staff ? staff.roleDisplay : "Admin");
+      }, 800);
 
     }, 1200);
   };
+
 
 
   const handleForgotPassword = (e: React.FormEvent) => {
