@@ -17,7 +17,7 @@ import {
   Trash2,
   Smartphone
 } from "lucide-react";
-import { db } from "../firebase";
+import { db } from "../lib/firebase";
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import {
   checkBiometricSupport,
