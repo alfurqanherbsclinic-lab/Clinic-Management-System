@@ -349,7 +349,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
     }, 1200);
   };
 
-  // Udhibiti Madhubuti wa Alama ya Kidole (Strict Fingerprint Validation)
+    // Udhibiti Madhubuti wa Alama ya Kidole (Strict Fingerprint Validation)
   const handleBiometricLogin = () => {
     setBiometricError("");
     setBiometricStatus("");
@@ -378,7 +378,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
           setBiometricScanning(false);
           setScanSuccess(false);
           onIncrementAttempts();
-          setBiometricError("âŒ ALAMA YA KIDOLE HAIJASAJILIWA! Access Denied. Alama hii haipo kwenye mfumo wa Al-Furqan.");
+          setBiometricError("❌ ALAMA YA KIDOLE HAIJASAJILIWA! Access Denied. Alama hii haipo kwenye mfumo wa Al-Furqan.");
           setBiometricStatus("");
         }, 1500);
 
@@ -391,7 +391,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
           setBiometricScanning(false);
           setScanSuccess(false);
           onIncrementAttempts();
-          setBiometricError("âŒ Mtumiaji huyu hajatambuliwa au amefutwa kabisa kwenye mfumo! Access Denied.");
+          setBiometricError("❌ Mtumiaji huyu hajatambuliwa au amefutwa kabisa kwenye mfumo! Access Denied.");
           return;
         }
 
@@ -401,18 +401,18 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
           setBiometricStatus(`Inalinganisha na alama iliyosajiliwa (${staff.fingerName || "Kidole cha Gumba"})...`);
 
           setTimeout(() => {
+            // HAPA NDIPO KUNAPOFANYA KAZI KABISA: Ukichagua kidole tofauti au WRONG, kinakataliwa mara moja!
             if (fingerMatchStatus === "WRONG") {
-              // Kidole Kingine Tofauti (Strict Rejection)
               setBiometricScanning(false);
               setScanSuccess(false);
               onIncrementAttempts();
-              setBiometricError(`âŒ ALAMA YA KIDOLE HAIINGILIANI! Kidole hiki sicho kilichosajiliwa kwa mtumiaji (${staff.name}). Kidole chake pekee kinachokubalika ni: [${staff.fingerName || "Kidole Kilichosajiliwa"}]. Access Denied!`);
+              setBiometricError(`❌ ALAMA YA KIDOLE HAIINGILIANI! Kidole hiki sicho kilichosajiliwa kwa mtumiaji (${staff.name}). Kidole chake pekee kinachokubalika ni: [${staff.fingerName || "Kidole Kilichosajiliwa"}]. Access Denied!`);
               setBiometricStatus("");
             } else if (fingerMatchStatus === "MATCH") {
-              // Kidole Sahihi Kilichosajiliwa Pekee Ndio Kinaruhusiwa
+              // Kidole Sahihi Kilichosajiliwa Pekee Ndio Kinaruhusiwa Kuingia
               setBiometricScanning(false);
               setScanSuccess(true);
-              setBiometricStatus(`âœ… ALAMA YA KIDOLE IMEINGILIANA SAHIHI! Karibu ${staff.name} (${staff.roleDisplay})`);
+              setBiometricStatus(`✅ ALAMA YA KIDOLE IMEINGILIANA SAHIHI! Karibu ${staff.name} (${staff.roleDisplay})`);
               
               setTimeout(() => {
                 onLoginSuccess(staff.username, staff.roleDisplay);
@@ -421,7 +421,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
               setBiometricScanning(false);
               setScanSuccess(false);
               onIncrementAttempts();
-              setBiometricError("âŒ Kidole kisichojulikana au kisicho sahihi! Access Denied.");
+              setBiometricError("❌ Kidole kisichojulikana au kisicho sahihi! Access Denied.");
               setBiometricStatus("");
             }
           }, 1200);
@@ -430,6 +430,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
 
     }, 1200);
   };
+
 
   const handleForgotPassword = (e: React.FormEvent) => {
     e.preventDefault();
