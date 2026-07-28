@@ -109,8 +109,7 @@ export function SettingsStaffModule({ activeSubTab = "settings_config" }: Settin
       role: staffRole,
       roleDisplay: roleDisplay,
       bioId: "FP-" + Math.floor(1000 + Math.random() * 9000) + "-REG",
-      fingerCode: "RIGHT_THUMB",
-      fingerName: "Kidole cha Gumba cha Kuume (Right Thumb)",
+      fingerName: "Kihisi cha Kidole (WebAuthn / Device Biometric)",
       phone: staffPhone || "07XXXXXXXX",
       status: "Active"
     };
@@ -357,7 +356,7 @@ export function SettingsStaffModule({ activeSubTab = "settings_config" }: Settin
                 Orodha ya Wafanyakazi Waliopo kwenye Database ({dbStaff.length}):
               </h3>
               <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                ● Live Firebase Firestore Sync
+                â— Live Firebase Firestore Sync
               </span>
             </div>
 
@@ -377,11 +376,11 @@ export function SettingsStaffModule({ activeSubTab = "settings_config" }: Settin
                     </p>
 
                     <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono">
-                      <span>📱 {s.phone || "07XXXXXXXX"}</span>
-                      <span>•</span>
+                      <span>ðŸ“± {s.phone || "07XXXXXXXX"}</span>
+                      <span>â€¢</span>
                       <span className="flex items-center gap-1 text-slate-600 font-bold">
                         <Fingerprint className="w-3 h-3 text-[#D6145A]" />
-                        {s.fingerName || "Kidole cha Gumba"}
+                        {s.webauthnCredential ? "WebAuthn Passkey Registered" : "Kihisi cha Kidole (Passkey Ready)"}
                       </span>
                     </div>
                   </div>
