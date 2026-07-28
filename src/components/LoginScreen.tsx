@@ -349,7 +349,7 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
     }, 1200);
   };
 
-    // Udhibiti Madhubuti wa Alama ya Kidole (Strict Fingerprint Validation)
+      // Udhibiti Madhubuti wa Alama ya Kidole (Strict Fingerprint Validation - Imara Zaidi)
   const handleBiometricLogin = () => {
     setBiometricError("");
     setBiometricStatus("");
@@ -361,72 +361,66 @@ export function LoginScreen({ onLoginSuccess, initialAttempts, onIncrementAttemp
     }
 
     if (!selectedFingerAttempt) {
-      setBiometricError("Mfumo hauwezi kutambua kidole! Tafadhali chagua alama ya kidole inayowekwa kwenye scanner ili kuanza.");
+      setBiometricError("Tafadhali chagua alama ya kidole kwenye kisanduku kwanza.");
       return;
     }
 
     setBiometricScanning(true);
-    setBiometricStatus("Scanning fingerprint... Weka na ushikilie kidole chako kwenye kifaa.");
+    setBiometricStatus("Scanning fingerprint... Weka kidole kwenye kifaa.");
 
     setTimeout(() => {
-      
-      // 1. Mtu kigeni / Kidole kisichosajiliwa (Strict Reject)
+      // Kama ni mtu kigeni
       if (selectedFingerAttempt === "unauthorized_finger") {
-        setBiometricStatus("Uhakiki umeanza... Inatafuta kwenye Database...");
-        
-        setTimeout(() => {
-          setBiometricScanning(false);
+        setBiometricScanning(false);
+        setScanSuccess(false);
+        onIncrementAttempts();
+        setBiometricError("❌ ALAMA YA KIDOLE HAIJASAJILIWA! Access Denied.");
+        setBiometricStatus("");
+        return;
+      }
+
+      const [staffId, fingerMatchStatus] = selectedFingerAttempt.split(":");
+      const staff = registeredStaff.find(s => s.id === staffId);
+
+      if (!staff) {
+        setBiometricScanning(false);
+        setScanSuccess(false);
+        onIncrementAttempts();
+        setBiometricError("❌ Mtumiaji hajatambuliwa! Access Denied.");
+        return;
+      }
+
+      setBiometricStatus("Inakagua alama ya kidole kwenye mfumo...");
+
+      setTimeout(() => {
+        setBiometricScanning(false);
+
+        // KANUNI KUBWA YA KUZUIA: Kama imewekwa WRONG au haijasoma MATCH sahihi, kataa moja kwa moja!
+        if (fingerMatchStatus === "WRONG" || selectedFingerAttempt.includes("WRONG")) {
           setScanSuccess(false);
           onIncrementAttempts();
-          setBiometricError("❌ ALAMA YA KIDOLE HAIJASAJILIWA! Access Denied. Alama hii haipo kwenye mfumo wa Al-Furqan.");
+          setBiometricError(`❌ KIDOLE KIMEKATALIWA! Kidole hiki sicho kilichosajiliwa kwa (${staff.name}). Inahitajika: [${staff.fingerName}].`);
           setBiometricStatus("");
-        }, 1500);
-
-      } else {
-        // Parse staffId na status ya kidole
-        const [staffId, fingerMatchStatus] = selectedFingerAttempt.split(":");
-        const staff = registeredStaff.find(s => s.id === staffId);
-
-        if (!staff) {
-          setBiometricScanning(false);
-          setScanSuccess(false);
-          onIncrementAttempts();
-          setBiometricError("❌ Mtumiaji huyu hajatambuliwa au amefutwa kabisa kwenye mfumo! Access Denied.");
           return;
         }
 
-        setBiometricStatus(`Inasoma vipimo vya kidole kinachowekwa...`);
-
-        setTimeout(() => {
-          setBiometricStatus(`Inalinganisha na alama iliyosajiliwa (${staff.fingerName || "Kidole cha Gumba"})...`);
-
+        // Kama ni MATCH sahihi pekee
+        if (fingerMatchStatus === "MATCH") {
+          setScanSuccess(true);
+          setBiometricStatus(`✅ KIDOLE KIMETHIBITISHWA! Karibu ${staff.name}`);
+          
           setTimeout(() => {
-            // HAPA NDIPO KUNAPOFANYA KAZI KABISA: Ukichagua kidole tofauti au WRONG, kinakataliwa mara moja!
-            if (fingerMatchStatus === "WRONG") {
-              setBiometricScanning(false);
-              setScanSuccess(false);
-              onIncrementAttempts();
-              setBiometricError(`❌ ALAMA YA KIDOLE HAIINGILIANI! Kidole hiki sicho kilichosajiliwa kwa mtumiaji (${staff.name}). Kidole chake pekee kinachokubalika ni: [${staff.fingerName || "Kidole Kilichosajiliwa"}]. Access Denied!`);
-              setBiometricStatus("");
-            } else if (fingerMatchStatus === "MATCH") {
-              // Kidole Sahihi Kilichosajiliwa Pekee Ndio Kinaruhusiwa Kuingia
-              setBiometricScanning(false);
-              setScanSuccess(true);
-              setBiometricStatus(`✅ ALAMA YA KIDOLE IMEINGILIANA SAHIHI! Karibu ${staff.name} (${staff.roleDisplay})`);
-              
-              setTimeout(() => {
-                onLoginSuccess(staff.username, staff.roleDisplay);
-              }, 800);
-            } else {
-              setBiometricScanning(false);
-              setScanSuccess(false);
-              onIncrementAttempts();
-              setBiometricError("❌ Kidole kisichojulikana au kisicho sahihi! Access Denied.");
-              setBiometricStatus("");
-            }
-          }, 1200);
-        }, 1200);
-      }
+            onLoginSuccess(staff.username, staff.roleDisplay);
+          }, 800);
+          return;
+        }
+
+        // Kinga ya ziada ya kukataa
+        setScanSuccess(false);
+        onIncrementAttempts();
+        setBiometricError("❌ Utambulisho wa kidole umeshindwa. Access Denied.");
+
+      }, 1200);
 
     }, 1200);
   };
