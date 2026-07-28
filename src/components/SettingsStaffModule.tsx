@@ -15,7 +15,7 @@ import {
   Fingerprint
 } from "lucide-react";
 import { StaffUser, AuditLog } from "../types";
-import { db } from "../firebase";
+import { db } from "../lib/firebase";
 import { collection, doc, setDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 
 interface SettingsStaffModuleProps {
